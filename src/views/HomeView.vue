@@ -305,7 +305,7 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
     }
     for (let idx of idxs) {
       for (let row of ds.data) {
-        data.push(row[idx])
+        data.push(row[idx] < -30 ? -30 : row[idx])
       }
     }
   }
@@ -318,7 +318,7 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
 
   const path = d3.geoPath().projection(d3.geoIdentity().scale(width / dataW))
   const contours = d3.contours().size([dataW, dataH])
-  const color = d3.scaleSequential(d3.interpolateTurbo).domain([-46, 5]) as any; /* 51 levels; 17 levels 3 dB apart */
+  const color = d3.scaleSequential(d3.interpolateTurbo).domain([-33, 3]) as any
   
   const graph = d3.select(svg)
   .attr("viewBox", [0, 0, width, height])
@@ -335,14 +335,14 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
   .attr("width", width - marginLeft - marginRight)
   .attr("height", height - marginTop - marginBottom)
   .attr("stroke", "black")
-  .attr("fill", color(-46))
+  .attr("fill", color(-30))
 
   graph.append("g")
   .attr("transform", `translate(${marginLeft},${marginTop}) scale(${(width - marginLeft - marginRight) / width}, ${(height - marginTop - marginBottom) / contourNaturalHeight})`)
   .attr("stroke-opacity", 0.2)
   .attr("stroke", "black")
   .selectAll()
-  .data(color.ticks(17))
+  .data(color.ticks(12))
   .join("path")
   .attr("d", (d: any) => path(contours.contour(data, d)))
   .attr("fill", color)
