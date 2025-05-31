@@ -4,7 +4,7 @@ import { onMounted, useTemplateRef } from "vue";
 import * as d3 from "d3";
 // @ts-ignore no types for this module
 import * as d3reg from "d3-regression";
-import { cloneSpinorama, normalizeCea2034, normalizeFrequencyData, preprocessCea2034, preprocessFrequencyData, readSpinoramaData, type SpinoramaData } from "@/util/spinorama";
+import { cea2034Di, cea2034NonDi, cloneSpinorama, normalizeCea2034, normalizeFrequencyData, preprocessCea2034, preprocessFrequencyData, readSpinoramaData, type SpinoramaData } from "@/util/spinorama";
 
 /* Chart dimensions etc. */
 const width = 2000
@@ -14,8 +14,6 @@ const marginRight = 40
 const marginBottom = 40
 const marginLeft = 40
 
-const cea2034NonDi = ["On Axis", "Listening Window", "Early Reflections", "Sound Power"];
-const cea2034Di = ["Sound Power DI", "Early Reflections DI"];
 const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-Axis", "-10°", "-20°", "-30°", "-40°", "-50°", "-60°"];
 
 const svgCea2034 = useTemplateRef("svgCea2034")
@@ -162,7 +160,7 @@ function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datasets?: s
 
 function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
   /* Labels for all datasets + index to that dataset's data in each row */
-  const datasets = dataset.datasets.filter(n => n)
+  const datasets = [...cea2034NonDi, ...cea2034Di]
   const datasetIndexes: { [key: string]: number } = {}
   for (let ds of datasets) {
     datasetIndexes[ds] = dataset.datasets.indexOf(ds)
@@ -253,7 +251,7 @@ function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
 
   graph.append("g")
   .selectAll("g")
-  .data([...cea2034NonDi, ...cea2034Di])
+  .data(datasets)
   .join("g")
   .append("text")
   .attr("transform", d => `translate(${width - marginRight - 10}, ${height - marginBottom - 15 * datasets.length + 15 * datasets.indexOf(d) + 5})`)
