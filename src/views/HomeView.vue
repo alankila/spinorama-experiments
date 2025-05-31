@@ -2,6 +2,8 @@
 
 import { onMounted, useTemplateRef } from "vue";
 import * as d3 from "d3";
+// @ts-ignore no types for this module
+import * as d3reg from "d3-regression";
 import { cloneSpinorama, normalizeCea2034, normalizeFrequencyData, preprocessCea2034, preprocessFrequencyData, readSpinoramaData, type SpinoramaData } from "@/util/spinorama";
 
 /* Chart dimensions etc. */
@@ -38,7 +40,7 @@ const svgVerticalContour = useTemplateRef("svgVerticalContour")
 const svgHorizontalContourNormalized = useTemplateRef("svgHorizontalContourNormalized")
 const svgVerticalContourNormalized = useTemplateRef("svgVerticalContourNormalized")
 
-function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datasets?: string[]) {
+function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datasets?: string[], regression?: { min: number, max: number }) {
   /* Labels for all datasets + index to that dataset's data in each row */
   datasets ||= dataset.datasets.filter(n => n)
   const datasetIndexes: { [key: string]: number } = {}
@@ -59,6 +61,49 @@ function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datasets?: s
   const graph = d3.select(svg)
   .attr("viewBox", [0, 0, width, height])
 
+    if (regression) {
+    const ds = datasets[0]
+    const idx = dataset.datasets.indexOf(ds);
+    const predictor = d3reg.regressionLinear()
+    .x((data: number[]) => Math.log(data[idx]))
+    .y((data: number[]) => data[idx + 1])
+    (dataset.data.filter(data => data[idx] >= regression.min && data[idx] <= regression.max));
+
+    let coords = line([[10, predictor.predict(Math.log(10))], [40000, predictor.predict(Math.log(40000))]]);
+    graph.append("clipPath")
+    .attr("id", "cut-graph")
+    .append("rect")
+    .attr("x", marginLeft)
+    .attr("y", marginTop)
+    .attr("width", width - marginLeft - marginRight)
+    .attr("height", height - marginTop - marginBottom)
+
+    graph.append("path")
+    .attr("stroke", "#cec")
+    .attr("stroke-width", y(-6) - y(0))
+    .attr("clip-path", "url(#cut-graph)")
+    .attr("d", coords);
+
+    graph.append("path")
+    .attr("stroke", "#ada")
+    .attr("stroke-width", y(-3) - y(0))
+    .attr("clip-path", "url(#cut-graph)")
+    .attr("d", coords);
+
+    /* FIXME: these lines should be projected perpendicular to the regression normal. They could be slightly off if the line is very steep. */
+    graph.append("path")
+    .attr("stroke", "#484")
+    .attr("stroke-width", "2")
+    .attr("stroke-dasharray", "5,5")
+    .attr("d", line([[regression.min, predictor.predict(Math.log(regression.min)) - 3], [regression.max, predictor.predict(Math.log(regression.max)) - 3]]))
+
+    graph.append("path")
+    .attr("stroke", "#484")
+    .attr("stroke-width", "2")
+    .attr("stroke-dasharray", "5,5")
+    .attr("d", line([[regression.min, predictor.predict(Math.log(regression.min)) + 3], [regression.max, predictor.predict(Math.log(regression.max)) + 3]]))
+  }
+
   graph.append("text")
   .attr("x", width / 2)
   .attr("y", marginTop/2)
@@ -77,7 +122,7 @@ function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datasets?: s
   graph.append("g")
   .attr("transform", `translate(0, ${height - marginBottom})`)
   .attr("stroke", "black")
-  .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0))
+  .call(d3.axisBottom(x).ticks(width / 60))
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
     .attr("y2", -height + marginTop + marginBottom))
@@ -160,7 +205,7 @@ function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
   graph.append("g")
   .attr("transform", `translate(0, ${height - marginBottom})`)
   .attr("stroke", "black")
-  .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0))
+  .call(d3.axisBottom(x).ticks(width / 60))
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
     .attr("y2", -height + marginTop + marginBottom))
@@ -290,7 +335,7 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
   graph.append("g")
   .attr("transform", `translate(0, ${height - marginBottom})`)
   .attr("stroke", "black")
-  .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0))
+  .call(d3.axisBottom(x).ticks(width / 60))
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
     .attr("y2", -height + marginTop + marginBottom))
@@ -311,12 +356,15 @@ const base = "public/datas/measurements/Genelec 8351B/asr-vertical/";
   const cea2034 = await readSpinoramaData(base + "CEA2034.txt");
   preprocessCea2034(cea2034);
   const cea2034Normalized = cloneSpinorama(cea2034);
-  normalizeCea2034(cea2034);
+  normalizeCea2034(cea2034Normalized);
 
   onMounted(() => {
     svgCea2034.value && renderCea2034Plot(svgCea2034.value, cea2034)
     svgCea2034Normalized.value && renderCea2034Plot(svgCea2034Normalized.value, cea2034Normalized)
-    svgOnAxis.value && renderFreqPlot(svgOnAxis.value, cea2034, ["On Axis"])
+    svgOnAxis.value && renderFreqPlot(svgOnAxis.value, cea2034, ["On Axis"], {
+      min: 300,
+      max: 5000,
+    })
   })
 }
 
@@ -332,7 +380,9 @@ const base = "public/datas/measurements/Genelec 8351B/asr-vertical/";
   const pir = await readSpinoramaData(base + "Estimated In-Room Response.txt")
   preprocessFrequencyData(pir);
   onMounted(() => {
-    svgPir.value && renderFreqPlot(svgPir.value, pir)
+    svgPir.value && renderFreqPlot(svgPir.value, pir, undefined, {
+      min: 300, max: 5000,
+    })
   })
 }
 
