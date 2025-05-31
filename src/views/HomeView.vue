@@ -223,7 +223,7 @@ onMounted(() => svg2.value && renderContour(svg2.value, vertDir))
 </script>
 
 <template>
-  <h1>Listening window</h1>
+  <h1>CEA2034</h1>
   <svg ref="svg"></svg>
 
   <h1>Vertical contour</h1>
