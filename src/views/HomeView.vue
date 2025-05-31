@@ -4,9 +4,21 @@ import { onMounted, useTemplateRef } from "vue";
 import { parse } from "papaparse";
 import * as d3 from "d3";
 
+/* Chart dimensions etc. */
+const width = 2000
+const height = 1000
+const marginTop = 40
+const marginRight = 40
+const marginBottom = 40
+const marginLeft = 40
+
+const cea2034NonDi = ["On Axis", "Listening Window", "Early Reflections", "Sound Power"];
+const cea2034Di = ["Sound Power DI", "Early Reflections DI"];
+
 const svgCea2034 = useTemplateRef("svgCea2034")
 const svgCea2034Normalized = useTemplateRef("svgCea2034Normalized")
 const svgEarlyReflections = useTemplateRef("svgEarlyReflections")
+const svgPir = useTemplateRef("svgPir")
 const svgHorizontalReflections = useTemplateRef("svgHorizontalReflections")
 const svgVerticalReflections = useTemplateRef("svgVerticalReflections")
 const svgHorizontalContour = useTemplateRef("svgHorizontalContour")
@@ -28,7 +40,7 @@ interface SpinoramaDataset {
 }
 
 async function readSpinoramaData(url: string): Promise<SpinoramaData> {
-  const graphResult = await fetch(url);
+  const graphResult = await fetch(url)
   const csv = (await graphResult.text()).replace(/\s+$/, "")
 
   let data = parse(csv, { delimiter: "\t" }).data as string[][]
@@ -58,9 +70,9 @@ async function readSpinoramaData(url: string): Promise<SpinoramaData> {
 }
 
 function getDataset(ds: SpinoramaData, dataset: string): SpinoramaDataset {
-  let i = ds.datasets.indexOf(dataset);
+  let i = ds.datasets.indexOf(dataset)
   if (i == -1) {
-    throw new Error("No such dataset: " + dataset);
+    throw new Error("No such dataset: " + dataset)
   }
 
   let j = i + 1;
@@ -76,33 +88,39 @@ function getDataset(ds: SpinoramaData, dataset: string): SpinoramaDataset {
 }
 
 function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData) {
-  // Declare the chart dimensions and margins.
-  const width = 2000;
-  const height = 1000;
-  const marginTop = 20;
-  const marginRight = 30;
-  const marginBottom = 30;
-  const marginLeft = 40;
-
   /* Labels for all datasets + index to that dataset's data in each row */
-  const datasets = dataset.datasets.filter(n => n);
+  const datasets = dataset.datasets.filter(n => n)
   const datasetIndexes: { [key: string]: number } = {}
   for (let ds of datasets) {
-    datasetIndexes[ds] = dataset.datasets.indexOf(ds);
+    datasetIndexes[ds] = dataset.datasets.indexOf(ds)
   }
 
   /* x & y scales, color scale for graphs, and coordinates for labels */
-  const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight]);
-  const y = d3.scaleLinear([-45, 5], [height - marginBottom, marginTop]);
-  const z = d3.scaleOrdinal(d3.schemeCategory10).domain(datasets);
+  const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight])
+  const y = d3.scaleLinear([-45, 5], [height - marginBottom, marginTop])
+  const z = d3.scaleOrdinal(d3.schemeCategory10).domain(datasets)
 
   /* line constructor */
   const line = d3.line()
   .x(d => x(d[0]))
-  .y(d => y(d[1]));
+  .y(d => y(d[1]))
 
   const graph = d3.select(svg)
-  .attr("viewBox", [0, 0, width, height]);
+  .attr("viewBox", [0, 0, width, height])
+
+  graph.append("text")
+  .attr("x", width / 2)
+  .attr("y", marginTop/2)
+  .attr("text-anchor", "middle")
+  .text(dataset.title)
+
+  graph.append("rect")
+  .attr("x", marginLeft)
+  .attr("y", marginTop)
+  .attr("width", width - marginLeft - marginRight)
+  .attr("height", height - marginTop - marginBottom)
+  .attr("stroke", "black")
+  .attr("fill", "none")
 
   /* x axis ticks */
   graph.append("g")
@@ -121,16 +139,11 @@ function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData) {
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
     .attr("x2", width - marginLeft - marginRight))
-  .call(g => g.append("text")
-    .attr("x", (width - marginRight)/2)
-    .attr("y", 12)
-    .attr("text-anchor", "middle")
-    .text(dataset.title))
-
+  
   let serie = graph.append("g")
   .selectAll("g")
   .data(datasets)
-  .join("g");
+  .join("g")
 
   serie.append("path")
   .attr("fill", "none")
@@ -139,16 +152,124 @@ function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData) {
   .attr("stroke-linecap", "round")
   .attr("stroke", d => z(d))
   .attr("d", d => {
-    const idx = datasetIndexes[d];
-    return line(dataset.data.map(data => [data[idx], data[idx + 1]]));
-  });
+    const idx = datasetIndexes[d]
+    return line(dataset.data.map(data => [data[idx], data[idx + 1]]))
+  })
 
   serie.append("text")
   .attr("transform", d => `translate(${width - marginRight - 10}, ${height - marginBottom - 15 * datasets.length + 15 * datasets.indexOf(d) + 5})`)
   .attr("fill", z)
   .style("font", "bold 10px sans-serif")
   .attr("text-anchor", "end")
-  .text(d => d);
+  .text(d => d)
+
+  return graph
+}
+
+function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
+  /* Labels for all datasets + index to that dataset's data in each row */
+  const datasets = dataset.datasets.filter(n => n)
+  const datasetIndexes: { [key: string]: number } = {}
+  for (let ds of datasets) {
+    datasetIndexes[ds] = dataset.datasets.indexOf(ds)
+  }
+
+  /* x & y scales, color scale for graphs, and coordinates for labels */
+  const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight])
+  const yLeft = d3.scaleLinear([-45, 5], [height - marginBottom, marginTop])
+  const yRight = d3.scaleLinear([-10, 10], [height - marginBottom, height / 2])
+  const z = d3.scaleOrdinal(d3.schemeCategory10).domain(datasets)
+
+  /* line constructors */
+  const lineLeft = d3.line()
+  .x(d => x(d[0]))
+  .y(d => yLeft(d[1]))
+  const lineRight = d3.line()
+  .x(d => x(d[0]))
+  .y(d => yRight(d[1]))
+
+  const graph = d3.select(svg)
+  .attr("viewBox", [0, 0, width, height])
+
+  graph.append("text")
+  .attr("x", width / 2)
+  .attr("y", marginTop / 2)
+  .attr("text-anchor", "middle")
+  .text(dataset.title)
+
+  graph.append("rect")
+  .attr("x", marginLeft)
+  .attr("y", marginTop)
+  .attr("width", width - marginLeft - marginRight)
+  .attr("height", height - marginTop - marginBottom)
+  .attr("stroke", "black")
+  .attr("fill", "none")
+
+  /* x axis ticks */
+  graph.append("g")
+  .attr("transform", `translate(0, ${height - marginBottom})`)
+  .attr("stroke", "black")
+  .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0))
+  .call(g => g.selectAll(".tick line").clone()
+    .attr("stroke-opacity", d => d === 1 ? null : 0.2)
+    .attr("y2", -height + marginTop + marginBottom))
+
+  /* y axis ticks */
+  graph.append("g")
+  .attr("transform", `translate(${marginLeft},0)`)
+  .attr("stroke", "black")
+  .call(d3.axisLeft(yLeft).ticks(height / 140))
+  .call(g => g.selectAll(".tick line").clone()
+    .attr("stroke-opacity", d => d === 1 ? null : 0.2)
+    .attr("x2", width - marginLeft - marginRight))
+
+  graph.append("g")
+  .attr("transform", `translate(${width - marginRight},0)`)
+  .attr("stroke", "black")
+  .call(d3.axisRight(yRight).ticks(height / 140))
+
+  let serieLeft = graph.append("g")
+  .selectAll("g")
+  .data(cea2034NonDi)
+  .join("g")
+
+  serieLeft.append("path")
+  .attr("fill", "none")
+  .attr("stroke-width", 1.5)
+  .attr("stroke-linejoin", "round")
+  .attr("stroke-linecap", "round")
+  .attr("stroke", z)
+  .attr("d", d => {
+    const idx = datasetIndexes[d];
+    return lineLeft(dataset.data.map(data => [data[idx], data[idx + 1]]))
+  })
+
+  let serieRight = graph.append("g")
+  .selectAll("g")
+  .data(cea2034Di)
+  .join("g")
+
+  serieRight.append("path")
+  .attr("fill", "none")
+  .attr("stroke-width", 1.5)
+  .attr("stroke-linejoin", "round")
+  .attr("stroke-linecap", "round")
+  .attr("stroke", z)
+  .attr("d", d => {
+    const idx = datasetIndexes[d];
+    return lineRight(dataset.data.map(data => [data[idx], data[idx + 1]]))
+  })
+
+  graph.append("g")
+  .selectAll("g")
+  .data([...cea2034NonDi, ...cea2034Di])
+  .join("g")
+  .append("text")
+  .attr("transform", d => `translate(${width - marginRight - 10}, ${height - marginBottom - 15 * datasets.length + 15 * datasets.indexOf(d) + 5})`)
+  .attr("fill", z)
+  .style("font", "bold 10px sans-serif")
+  .attr("text-anchor", "end")
+  .text(d => d)
 }
 
 function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
@@ -177,34 +298,42 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
     }
   }
 
-  const width = 2000;
-
-  const marginTop = 20;
-  const marginRight = 30;
-  const marginBottom = 30;
-  const marginLeft = 40;
-  const height = (width - marginLeft - marginBottom) / dataW * dataH + marginTop + marginBottom;
+  const contourNaturalHeight = width / dataW * dataH;
 
   /* x & y scales */
-  const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight]);
-  const y = d3.scaleLinear([-180, 180], [height - marginBottom, marginTop]);
+  const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight])
+  const y = d3.scaleLinear([-180, 180], [height - marginBottom, marginTop])
 
-  const path = d3.geoPath().projection(d3.geoIdentity().scale((width - marginLeft - marginBottom) / dataW));
-  const contours = d3.contours().size([dataW, dataH]);
-  const color = d3.scaleSequential(d3.interpolateTurbo).domain([-45, 5]) as any;
+  const path = d3.geoPath().projection(d3.geoIdentity().scale(width / dataW))
+  const contours = d3.contours().size([dataW, dataH])
+  const color = d3.scaleSequential(d3.interpolateTurbo).domain([-46, 5]) as any; /* 51 levels; 17 levels 3 dB apart */
   
   const graph = d3.select(svg)
-  .attr("viewBox", [0, 0, width, height]);
+  .attr("viewBox", [0, 0, width, height])
+
+  graph.append("text")
+  .attr("x", width / 2)
+  .attr("y", marginTop / 2)
+  .attr("text-anchor", "middle")
+  .text(ds.title)
+
+  graph.append("rect")
+  .attr("x", marginLeft)
+  .attr("y", marginTop)
+  .attr("width", width - marginLeft - marginRight)
+  .attr("height", height - marginTop - marginBottom)
+  .attr("stroke", "black")
+  .attr("fill", color(-46))
 
   graph.append("g")
-  .attr("transform", `translate(${marginLeft},${marginTop})`)
+  .attr("transform", `translate(${marginLeft},${marginTop}) scale(${(width - marginLeft - marginRight) / width}, ${(height - marginTop - marginBottom) / contourNaturalHeight})`)
   .attr("stroke-opacity", 0.2)
   .attr("stroke", "black")
   .selectAll()
-  .data(color.ticks(32))
+  .data(color.ticks(17))
   .join("path")
   .attr("d", (d: any) => path(contours.contour(data, d)))
-  .attr("fill", color);
+  .attr("fill", color)
 
   /* x axis ticks */
   graph.append("g")
@@ -223,100 +352,123 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
     .attr("x2", width - marginLeft - marginRight))
-  .call(g => g.append("text")
-    .attr("x", (width - marginRight)/2)
-    .attr("y", 12)
-    .attr("text-anchor", "middle")
-    .text(ds.title))
-
 }
 
 const base = "public/datas/measurements/Genelec 8351B/asr-vertical/";
 
 const cea2034 = await readSpinoramaData(base + "CEA2034.txt")
-onMounted(() => {
-  let nonDiIndex = ["On Axis", "Listening Window", "Early Reflections", "Sound Power"].map(d => cea2034.datasets.indexOf(d));
+const cea2034Normalized: SpinoramaData = JSON.parse(JSON.stringify(cea2034))
+{
+  /* Experimentally, this is what needs to be done to fix CEA2034 data: remove 86 dB from freq data */
+  let nonDiIndex = cea2034NonDi.map(d => cea2034.datasets.indexOf(d))
+  /* Subtract DI offset from DI data */
+  let diOffset = cea2034.datasets.indexOf("DI offset")
+  let diIndex = cea2034Di.map(d => cea2034.datasets.indexOf(d))
   for (let data of cea2034.data) {
     for (let i of nonDiIndex) {
       data[i + 1] -= 86;
     }
+    for (let i of diIndex) {
+      data[i + 1] -= data[diOffset + 1];
+    }
   }
-  /* FIXME! DI is on different scale. We need to render CEA2034 separately */
-  svgCea2034.value && renderFreqPlot(svgCea2034.value, cea2034);
 
-  const cea2034Normalized: SpinoramaData = JSON.parse(JSON.stringify(cea2034))
   for (let data of cea2034Normalized.data) {
     const norm = data[nonDiIndex[0] + 1];
     for (let i of nonDiIndex) {
       data[i + 1] -= norm;
     }
+    for (let i of diIndex) {
+      data[i + 1] -= data[diOffset + 1];
+    }
   }
-  svgCea2034Normalized.value && renderFreqPlot(svgCea2034Normalized.value, cea2034Normalized)
-});
-
-const earlyReflections = await readSpinoramaData(base + "Early Reflections.txt");
+}
 onMounted(() => {
+  svgCea2034.value && renderCea2034Plot(svgCea2034.value, cea2034)
+  svgCea2034Normalized.value && renderCea2034Plot(svgCea2034Normalized.value, cea2034Normalized)
+})
+
+const earlyReflections = await readSpinoramaData(base + "Early Reflections.txt")
+{
   for (let data of earlyReflections.data) {
     for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= 86;
+      data[i + 1] -= 86
     }
   }
-  svgEarlyReflections.value && renderFreqPlot(svgEarlyReflections.value, earlyReflections)
-});
-
-const horizontalReflections = await readSpinoramaData(base + "Horizontal Reflections.txt");
+}
 onMounted(() => {
+  svgEarlyReflections.value && renderFreqPlot(svgEarlyReflections.value, earlyReflections)
+})
+
+const pir = await readSpinoramaData(base + "Estimated In-Room Response.txt")
+{
+  for (let data of pir.data) {
+    for (let i = 0; i < data.length; i += 2) {
+      data[i + 1] -= 86
+    }
+  }
+}
+onMounted(() => {
+  svgPir.value && renderFreqPlot(svgPir.value, pir)
+})
+
+const horizontalReflections = await readSpinoramaData(base + "Horizontal Reflections.txt")
+{
   for (let data of horizontalReflections.data) {
     for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= 86;
+      data[i + 1] -= 86
     }
   }
-  svgHorizontalReflections.value && renderFreqPlot(svgHorizontalReflections.value, earlyReflections)
-});
-
-const verticalReflections = await readSpinoramaData(base + "Vertical Reflections.txt");
+}
 onMounted(() => {
+  svgHorizontalReflections.value && renderFreqPlot(svgHorizontalReflections.value, earlyReflections)
+})
+
+const verticalReflections = await readSpinoramaData(base + "Vertical Reflections.txt")
+{
   for (let data of verticalReflections.data) {
     for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= 86;
+      data[i + 1] -= 86
     }
   }
+}
+onMounted(() => {
   svgVerticalReflections.value && renderFreqPlot(svgVerticalReflections.value, verticalReflections)
-});
+})
 
 const hortDir = await readSpinoramaData(base + "SPL Horizontal.txt")
 onMounted(() => {
   for (let data of hortDir.data) {
     for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= 86;
+      data[i + 1] -= 86
     }
   }
-  svgHorizontalContour.value && renderContour(svgHorizontalContour.value, hortDir);
+  svgHorizontalContour.value && renderContour(svgHorizontalContour.value, hortDir)
 
   const hortDirNormalized: SpinoramaData = JSON.parse(JSON.stringify(hortDir))
-  const idx = hortDirNormalized.datasets.indexOf("On-Axis");
+  const idx = hortDirNormalized.datasets.indexOf("On-Axis")
   for (let data of hortDirNormalized.data) {
     for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= data[idx + 1];
+      data[i + 1] -= data[idx + 1]
     }
   }
-  svgHorizontalContourNormalized.value && renderContour(svgHorizontalContourNormalized.value, hortDirNormalized);
+  svgHorizontalContourNormalized.value && renderContour(svgHorizontalContourNormalized.value, hortDirNormalized)
 })
 
 const vertDir = await readSpinoramaData(base + "SPL Vertical.txt")
 onMounted(() => {
   for (let data of vertDir.data) {
     for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= 86;
+      data[i + 1] -= 86
     }
   }
   svgVerticalContour.value && renderContour(svgVerticalContour.value, vertDir)
 
   const vertDirNormalized: SpinoramaData = JSON.parse(JSON.stringify(vertDir))
-  const idx = vertDirNormalized.datasets.indexOf("On-Axis");
+  const idx = vertDirNormalized.datasets.indexOf("On-Axis")
   for (let data of vertDirNormalized.data) {
     for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= data[idx + 1];
+      data[i + 1] -= data[idx + 1]
     }
   }
   svgVerticalContourNormalized.value && renderContour(svgVerticalContourNormalized.value, vertDirNormalized)
@@ -333,6 +485,9 @@ onMounted(() => {
 
   <h1>Early reflections</h1>
   <svg ref="svgEarlyReflections"></svg>
+
+  <h1>Estimated In-Room Response</h1>
+  <svg ref="svgPir"></svg>
 
   <h1>Horizontal reflections</h1>
   <svg ref="svgHorizontalReflections"></svg>
