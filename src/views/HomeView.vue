@@ -1,8 +1,8 @@
 <script setup lang="ts">
 
 import { onMounted, useTemplateRef } from "vue";
-import { parse } from "papaparse";
 import * as d3 from "d3";
+import { cloneSpinorama, normalizeCea2034, normalizeFrequencyData, preprocessCea2034, preprocessFrequencyData, readSpinoramaData, type SpinoramaData } from "@/util/spinorama";
 
 /* Chart dimensions etc. */
 const width = 2000
@@ -37,67 +37,6 @@ const svgHorizontalContour = useTemplateRef("svgHorizontalContour")
 const svgVerticalContour = useTemplateRef("svgVerticalContour")
 const svgHorizontalContourNormalized = useTemplateRef("svgHorizontalContourNormalized")
 const svgVerticalContourNormalized = useTemplateRef("svgVerticalContourNormalized")
-
-interface SpinoramaData {
-  title: string,
-  datasets: string[],
-  headers: string[],
-  data: number[][],
-}
-
-interface SpinoramaDataset {
-  dataset: string,
-  headers: string[],
-  data: number[][],
-}
-
-async function readSpinoramaData(url: string): Promise<SpinoramaData> {
-  const graphResult = await fetch(url)
-  const csv = (await graphResult.text()).replace(/\s+$/, "")
-
-  let data = parse(csv, { delimiter: "\t" }).data as string[][]
-  let title = data.shift() ?? ""
-  let datasets = data.shift() ?? []
-  let headers = data.shift() ?? []
-
-  /* Spinorama's data format explanation. File is tab-separated CSV collection of data points.
-   * Usually, multiple datasets are stored in each file. Format has 3 header rows, followed by the data rows.
-   * 
-   * The first row labels the dataset (1 column in CSV)
-   * 
-   * Second row indicates starts indexes of each datasets.
-   * The cell is empty if that column belongs to the preceding dataset.
-   * 
-   * The third row labels the data rows, and is like a traditional CSV header.
-   * 
-   * Data rows are formatted in U.S. numeric format with thousands separator,
-   * e.g. 1,234.56.
-   */
-  return {
-    title: title![0],
-    datasets,
-    headers,
-    data: data.map(da => da.map(n => parseFloat(n.replace(",", "")))),
-  }
-}
-
-function getDataset(ds: SpinoramaData, dataset: string): SpinoramaDataset {
-  let i = ds.datasets.indexOf(dataset)
-  if (i == -1) {
-    throw new Error("No such dataset: " + dataset)
-  }
-
-  let j = i + 1;
-  while (!ds.datasets[j]) {
-    j ++;
-  }
-
-  return {
-    dataset: dataset,
-    headers: ds.headers.slice(i, j),
-    data: ds.data.map(d => d.slice(i, j)),
-  };
-}
 
 function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datasets?: string[]) {
   /* Labels for all datasets + index to that dataset's data in each row */
@@ -369,30 +308,10 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
 const base = "public/datas/measurements/Genelec 8351B/asr-vertical/";
 
 {
-  const cea2034 = await readSpinoramaData(base + "CEA2034.txt")
-  const cea2034Normalized: SpinoramaData = JSON.parse(JSON.stringify(cea2034))
-  
-  let nonDiIndex = cea2034NonDi.map(d => cea2034.datasets.indexOf(d))
-  let diOffset = cea2034.datasets.indexOf("DI offset")
-  let diIndex = cea2034Di.map(d => cea2034.datasets.indexOf(d))
-  for (let data of cea2034.data) {
-    for (let i of nonDiIndex) {
-      data[i + 1] -= 86;
-    }
-    for (let i of diIndex) {
-      data[i + 1] -= data[diOffset + 1];
-    }
-  }
-
-  for (let data of cea2034Normalized.data) {
-    const norm = data[nonDiIndex[0] + 1];
-    for (let i of nonDiIndex) {
-      data[i + 1] -= norm;
-    }
-    for (let i of diIndex) {
-      data[i + 1] -= data[diOffset + 1];
-    }
-  }
+  const cea2034 = await readSpinoramaData(base + "CEA2034.txt");
+  preprocessCea2034(cea2034);
+  const cea2034Normalized = cloneSpinorama(cea2034);
+  normalizeCea2034(cea2034);
 
   onMounted(() => {
     svgCea2034.value && renderCea2034Plot(svgCea2034.value, cea2034)
@@ -403,11 +322,7 @@ const base = "public/datas/measurements/Genelec 8351B/asr-vertical/";
 
 {
   const earlyReflections = await readSpinoramaData(base + "Early Reflections.txt")
-  for (let data of earlyReflections.data) {
-    for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= 86
-    }
-  }
+  preprocessFrequencyData(earlyReflections);
   onMounted(() => {
     svgEarlyReflections.value && renderFreqPlot(svgEarlyReflections.value, earlyReflections)
   })
@@ -415,11 +330,7 @@ const base = "public/datas/measurements/Genelec 8351B/asr-vertical/";
 
 {
   const pir = await readSpinoramaData(base + "Estimated In-Room Response.txt")
-  for (let data of pir.data) {
-    for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= 86
-    }
-  }
+  preprocessFrequencyData(pir);
   onMounted(() => {
     svgPir.value && renderFreqPlot(svgPir.value, pir)
   })
@@ -427,11 +338,7 @@ const base = "public/datas/measurements/Genelec 8351B/asr-vertical/";
 
 {
   const horizontalReflections = await readSpinoramaData(base + "Horizontal Reflections.txt")
-  for (let data of horizontalReflections.data) {
-    for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= 86
-    }
-  }
+  preprocessFrequencyData(horizontalReflections);
   onMounted(() => {
     svgHorizontalReflections.value && renderFreqPlot(svgHorizontalReflections.value, horizontalReflections)
   })
@@ -439,11 +346,7 @@ const base = "public/datas/measurements/Genelec 8351B/asr-vertical/";
 
 {
   const verticalReflections = await readSpinoramaData(base + "Vertical Reflections.txt")
-  for (let data of verticalReflections.data) {
-    for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= 86
-    }
-  }
+  preprocessFrequencyData(verticalReflections);
   onMounted(() => {
     svgVerticalReflections.value && renderFreqPlot(svgVerticalReflections.value, verticalReflections)
   })
@@ -451,21 +354,9 @@ const base = "public/datas/measurements/Genelec 8351B/asr-vertical/";
 
 {
   const horizontalContour = await readSpinoramaData(base + "SPL Horizontal.txt")
-  const horizontalContourNormalized: SpinoramaData = JSON.parse(JSON.stringify(horizontalContour))
-  
-  for (let data of horizontalContour.data) {
-    for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= 86
-    }
-  }
-
-  const idx = horizontalContourNormalized.datasets.indexOf("On-Axis")
-  for (let data of horizontalContourNormalized.data) {
-    const value = data[idx + 1]
-    for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= value
-    }
-  }
+  preprocessFrequencyData(horizontalContour);
+  const horizontalContourNormalized = cloneSpinorama(horizontalContour);
+  normalizeFrequencyData(horizontalContourNormalized, "On-Axis");
 
   onMounted(() => {
     svgHorizontalContour.value && renderContour(svgHorizontalContour.value, horizontalContour)
@@ -478,21 +369,10 @@ const base = "public/datas/measurements/Genelec 8351B/asr-vertical/";
 
 {
   const verticalContour = await readSpinoramaData(base + "SPL Vertical.txt")
-  const verticalContourNormalized: SpinoramaData = JSON.parse(JSON.stringify(verticalContour))
+  preprocessFrequencyData(verticalContour);
+  const verticalContourNormalized = cloneSpinorama(verticalContour);
+  normalizeFrequencyData(verticalContourNormalized, "On-Axis");
 
-  for (let data of verticalContour.data) {
-    for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= 86
-    }
-  }
-  const idx = verticalContourNormalized.datasets.indexOf("On-Axis")
-  for (let data of verticalContourNormalized.data) {
-    const value = data[idx + 1]
-    for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= value
-    }
-  }
-  
   onMounted(() => {
     svgVerticalContour.value && renderContour(svgVerticalContour.value, verticalContour)
     svgVerticalContourNormalized.value && renderContour(svgVerticalContourNormalized.value, verticalContourNormalized)
