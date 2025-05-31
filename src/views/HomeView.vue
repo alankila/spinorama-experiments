@@ -29,8 +29,18 @@ async function readSpinoramaData(url: string): Promise<SpinoramaData> {
   let datasets = data.shift() ?? []
   let headers = data.shift() ?? []
 
-  /* If you want to find the data (and headers) for a dataset,
-   * you must calculate the appropriate indexes and take out those specific values.
+  /* Spinorama's data format explanation. File is tab-separated CSV collection of data points.
+   * Usually, multiple datasets are stored in each file. Format has 3 header rows, followed by the data rows.
+   * 
+   * The first row labels the dataset (1 column in CSV)
+   * 
+   * Second row indicates starts indexes of each datasets.
+   * The cell is empty if that column belongs to the preceding dataset.
+   * 
+   * The third row labels the data rows, and is like a traditional CSV header.
+   * 
+   * Data rows are formatted in U.S. numeric format with thousands separator,
+   * e.g. 1,234.56.
    */
   return {
     title: title![0],
@@ -138,7 +148,7 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
   /* Preprocess the dataset. */
   let datasets = [
     "180°", "170°", "160°", "150°", "140°", "130°", "120°", "110°", "100°", "90°", "80°", "70°", "60°", "50°", "40°", "30°", "20°", "10°", "On-Axis",
-    "-10°", "-20°", "-30°", "-40°", "-50°", "-60°", "-70°", "-80°", "-90°", "-100°", "-110°", "-120°", "-130°", "-140°", "-150°", "-160°", "-170°",
+    "-10°", "-20°", "-30°", "-40°", "-50°", "-60°", "-70°", "-80°", "-90°", "-100°", "-110°", "-120°", "-130°", "-140°", "-150°", "-160°", "-170°", "180°"
   ];
 
   let dataW = ds.data.length;
@@ -170,7 +180,7 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
 
   /* x & y scales */
   const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight]);
-  const y = d3.scaleLinear([-170, 180], [height - marginBottom, marginTop]);
+  const y = d3.scaleLinear([-180, 180], [height - marginBottom, marginTop]);
 
   const path = d3.geoPath().projection(d3.geoIdentity().scale((width - marginLeft - marginBottom) / dataW));
   const contours = d3.contours().size([dataW, dataH]);
