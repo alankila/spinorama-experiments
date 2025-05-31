@@ -318,10 +318,12 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
 
   graph.append("g")
   .attr("transform", `translate(${marginLeft},${marginTop}) scale(${(width - marginLeft - marginRight) / width}, ${(height - marginTop - marginBottom) / contourNaturalHeight})`)
-  .attr("stroke-opacity", 0.2)
+  .attr("stroke-opacity", 0.5)
+  .attr("stroke", "black")
   .selectAll()
   .data(color.ticks(12))
   .join("path")
+  .attr("vector-effect", "non-scaling-stroke")
   .attr("d", (d: any) => path(contours.contour(data, d)))
   .attr("fill", color)
 
