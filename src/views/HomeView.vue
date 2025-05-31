@@ -61,7 +61,7 @@ function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datasets?: s
   const graph = d3.select(svg)
   .attr("viewBox", [0, 0, width, height])
 
-    if (regression) {
+  if (regression) {
     const ds = datasets[0]
     const idx = dataset.datasets.indexOf(ds);
     const predictor = d3reg.regressionLinear()
@@ -121,7 +121,6 @@ function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datasets?: s
   /* x axis ticks */
   graph.append("g")
   .attr("transform", `translate(0, ${height - marginBottom})`)
-  .attr("stroke", "black")
   .call(d3.axisBottom(x).ticks(width / 60))
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
@@ -130,7 +129,6 @@ function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datasets?: s
   /* y axis ticks */
   graph.append("g")
   .attr("transform", `translate(${marginLeft},0)`)
-  .attr("stroke", "black")
   .call(d3.axisLeft(y).ticks(height / 140))
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
@@ -204,7 +202,6 @@ function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
   /* x axis ticks */
   graph.append("g")
   .attr("transform", `translate(0, ${height - marginBottom})`)
-  .attr("stroke", "black")
   .call(d3.axisBottom(x).ticks(width / 60))
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
@@ -213,7 +210,6 @@ function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
   /* y axis ticks */
   graph.append("g")
   .attr("transform", `translate(${marginLeft},0)`)
-  .attr("stroke", "black")
   .call(d3.axisLeft(yLeft).ticks(height / 140))
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
@@ -221,7 +217,6 @@ function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
 
   graph.append("g")
   .attr("transform", `translate(${width - marginRight},0)`)
-  .attr("stroke", "black")
   .call(d3.axisRight(yRight).ticks(height / 140))
 
   let serieLeft = graph.append("g")
@@ -324,7 +319,6 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
   graph.append("g")
   .attr("transform", `translate(${marginLeft},${marginTop}) scale(${(width - marginLeft - marginRight) / width}, ${(height - marginTop - marginBottom) / contourNaturalHeight})`)
   .attr("stroke-opacity", 0.2)
-  .attr("stroke", "black")
   .selectAll()
   .data(color.ticks(12))
   .join("path")
@@ -334,7 +328,6 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
   /* x axis ticks */
   graph.append("g")
   .attr("transform", `translate(0, ${height - marginBottom})`)
-  .attr("stroke", "black")
   .call(d3.axisBottom(x).ticks(width / 60))
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
@@ -343,7 +336,6 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
   /* y axis ticks */
   graph.append("g")
   .attr("transform", `translate(${marginLeft},0)`)
-  .attr("stroke", "black")
   .call(d3.axisLeft(y).ticks(height / 40))
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
