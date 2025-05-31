@@ -14,13 +14,25 @@ const marginLeft = 40
 
 const cea2034NonDi = ["On Axis", "Listening Window", "Early Reflections", "Sound Power"];
 const cea2034Di = ["Sound Power DI", "Early Reflections DI"];
+const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-Axis", "-10°", "-20°", "-30°", "-40°", "-50°", "-60°"];
 
 const svgCea2034 = useTemplateRef("svgCea2034")
 const svgCea2034Normalized = useTemplateRef("svgCea2034Normalized")
+
+const svgOnAxis = useTemplateRef("svgOnAxis")
+
 const svgEarlyReflections = useTemplateRef("svgEarlyReflections")
+
 const svgPir = useTemplateRef("svgPir")
+
 const svgHorizontalReflections = useTemplateRef("svgHorizontalReflections")
 const svgVerticalReflections = useTemplateRef("svgVerticalReflections")
+
+const svgHorizontal = useTemplateRef("svgHorizontal")
+const svgVertical = useTemplateRef("svgVertical")
+const svgHorizontalNormalized = useTemplateRef("svgHorizontalNormalized")
+const svgVerticalNormalized = useTemplateRef("svgVerticalNormalized")
+
 const svgHorizontalContour = useTemplateRef("svgHorizontalContour")
 const svgVerticalContour = useTemplateRef("svgVerticalContour")
 const svgHorizontalContourNormalized = useTemplateRef("svgHorizontalContourNormalized")
@@ -87,9 +99,9 @@ function getDataset(ds: SpinoramaData, dataset: string): SpinoramaDataset {
   };
 }
 
-function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData) {
+function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datasets?: string[]) {
   /* Labels for all datasets + index to that dataset's data in each row */
-  const datasets = dataset.datasets.filter(n => n)
+  datasets ||= dataset.datasets.filter(n => n)
   const datasetIndexes: { [key: string]: number } = {}
   for (let ds of datasets) {
     datasetIndexes[ds] = dataset.datasets.indexOf(ds)
@@ -356,12 +368,11 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
 
 const base = "public/datas/measurements/Genelec 8351B/asr-vertical/";
 
-const cea2034 = await readSpinoramaData(base + "CEA2034.txt")
-const cea2034Normalized: SpinoramaData = JSON.parse(JSON.stringify(cea2034))
 {
-  /* Experimentally, this is what needs to be done to fix CEA2034 data: remove 86 dB from freq data */
+  const cea2034 = await readSpinoramaData(base + "CEA2034.txt")
+  const cea2034Normalized: SpinoramaData = JSON.parse(JSON.stringify(cea2034))
+  
   let nonDiIndex = cea2034NonDi.map(d => cea2034.datasets.indexOf(d))
-  /* Subtract DI offset from DI data */
   let diOffset = cea2034.datasets.indexOf("DI offset")
   let diIndex = cea2034Di.map(d => cea2034.datasets.indexOf(d))
   for (let data of cea2034.data) {
@@ -382,97 +393,114 @@ const cea2034Normalized: SpinoramaData = JSON.parse(JSON.stringify(cea2034))
       data[i + 1] -= data[diOffset + 1];
     }
   }
-}
-onMounted(() => {
-  svgCea2034.value && renderCea2034Plot(svgCea2034.value, cea2034)
-  svgCea2034Normalized.value && renderCea2034Plot(svgCea2034Normalized.value, cea2034Normalized)
-})
 
-const earlyReflections = await readSpinoramaData(base + "Early Reflections.txt")
+  onMounted(() => {
+    svgCea2034.value && renderCea2034Plot(svgCea2034.value, cea2034)
+    svgCea2034Normalized.value && renderCea2034Plot(svgCea2034Normalized.value, cea2034Normalized)
+    svgOnAxis.value && renderFreqPlot(svgOnAxis.value, cea2034, ["On Axis"])
+  })
+}
+
 {
+  const earlyReflections = await readSpinoramaData(base + "Early Reflections.txt")
   for (let data of earlyReflections.data) {
     for (let i = 0; i < data.length; i += 2) {
       data[i + 1] -= 86
     }
   }
+  onMounted(() => {
+    svgEarlyReflections.value && renderFreqPlot(svgEarlyReflections.value, earlyReflections)
+  })
 }
-onMounted(() => {
-  svgEarlyReflections.value && renderFreqPlot(svgEarlyReflections.value, earlyReflections)
-})
 
-const pir = await readSpinoramaData(base + "Estimated In-Room Response.txt")
 {
+  const pir = await readSpinoramaData(base + "Estimated In-Room Response.txt")
   for (let data of pir.data) {
     for (let i = 0; i < data.length; i += 2) {
       data[i + 1] -= 86
     }
   }
+  onMounted(() => {
+    svgPir.value && renderFreqPlot(svgPir.value, pir)
+  })
 }
-onMounted(() => {
-  svgPir.value && renderFreqPlot(svgPir.value, pir)
-})
 
-const horizontalReflections = await readSpinoramaData(base + "Horizontal Reflections.txt")
 {
+  const horizontalReflections = await readSpinoramaData(base + "Horizontal Reflections.txt")
   for (let data of horizontalReflections.data) {
     for (let i = 0; i < data.length; i += 2) {
       data[i + 1] -= 86
     }
   }
+  onMounted(() => {
+    svgHorizontalReflections.value && renderFreqPlot(svgHorizontalReflections.value, horizontalReflections)
+  })
 }
-onMounted(() => {
-  svgHorizontalReflections.value && renderFreqPlot(svgHorizontalReflections.value, earlyReflections)
-})
 
-const verticalReflections = await readSpinoramaData(base + "Vertical Reflections.txt")
 {
+  const verticalReflections = await readSpinoramaData(base + "Vertical Reflections.txt")
   for (let data of verticalReflections.data) {
     for (let i = 0; i < data.length; i += 2) {
       data[i + 1] -= 86
     }
   }
+  onMounted(() => {
+    svgVerticalReflections.value && renderFreqPlot(svgVerticalReflections.value, verticalReflections)
+  })
 }
-onMounted(() => {
-  svgVerticalReflections.value && renderFreqPlot(svgVerticalReflections.value, verticalReflections)
-})
 
-const hortDir = await readSpinoramaData(base + "SPL Horizontal.txt")
-onMounted(() => {
-  for (let data of hortDir.data) {
+{
+  const horizontalContour = await readSpinoramaData(base + "SPL Horizontal.txt")
+  const horizontalContourNormalized: SpinoramaData = JSON.parse(JSON.stringify(horizontalContour))
+  
+  for (let data of horizontalContour.data) {
     for (let i = 0; i < data.length; i += 2) {
       data[i + 1] -= 86
     }
   }
-  svgHorizontalContour.value && renderContour(svgHorizontalContour.value, hortDir)
 
-  const hortDirNormalized: SpinoramaData = JSON.parse(JSON.stringify(hortDir))
-  const idx = hortDirNormalized.datasets.indexOf("On-Axis")
-  for (let data of hortDirNormalized.data) {
+  const idx = horizontalContourNormalized.datasets.indexOf("On-Axis")
+  for (let data of horizontalContourNormalized.data) {
+    const value = data[idx + 1]
     for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= data[idx + 1]
+      data[i + 1] -= value
     }
   }
-  svgHorizontalContourNormalized.value && renderContour(svgHorizontalContourNormalized.value, hortDirNormalized)
-})
 
-const vertDir = await readSpinoramaData(base + "SPL Vertical.txt")
-onMounted(() => {
-  for (let data of vertDir.data) {
+  onMounted(() => {
+    svgHorizontalContour.value && renderContour(svgHorizontalContour.value, horizontalContour)
+    svgHorizontalContourNormalized.value && renderContour(svgHorizontalContourNormalized.value, horizontalContourNormalized)
+
+    svgHorizontal.value && renderFreqPlot(svgHorizontal.value, horizontalContour, directivityAngles)
+    svgHorizontalNormalized.value && renderFreqPlot(svgHorizontalNormalized.value, horizontalContourNormalized, directivityAngles)
+  })
+}
+
+{
+  const verticalContour = await readSpinoramaData(base + "SPL Vertical.txt")
+  const verticalContourNormalized: SpinoramaData = JSON.parse(JSON.stringify(verticalContour))
+
+  for (let data of verticalContour.data) {
     for (let i = 0; i < data.length; i += 2) {
       data[i + 1] -= 86
     }
   }
-  svgVerticalContour.value && renderContour(svgVerticalContour.value, vertDir)
-
-  const vertDirNormalized: SpinoramaData = JSON.parse(JSON.stringify(vertDir))
-  const idx = vertDirNormalized.datasets.indexOf("On-Axis")
-  for (let data of vertDirNormalized.data) {
+  const idx = verticalContourNormalized.datasets.indexOf("On-Axis")
+  for (let data of verticalContourNormalized.data) {
+    const value = data[idx + 1]
     for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= data[idx + 1]
+      data[i + 1] -= value
     }
   }
-  svgVerticalContourNormalized.value && renderContour(svgVerticalContourNormalized.value, vertDirNormalized)
-})
+  
+  onMounted(() => {
+    svgVerticalContour.value && renderContour(svgVerticalContour.value, verticalContour)
+    svgVerticalContourNormalized.value && renderContour(svgVerticalContourNormalized.value, verticalContourNormalized)
+
+    svgVertical.value && renderFreqPlot(svgVertical.value, verticalContour, directivityAngles)
+    svgVerticalNormalized.value && renderFreqPlot(svgVerticalNormalized.value, verticalContourNormalized, directivityAngles)
+  })
+}
 
 </script>
 
@@ -482,6 +510,9 @@ onMounted(() => {
 
   <h1>CEA2034 Normalized</h1>
   <svg ref="svgCea2034Normalized"></svg>
+
+  <h1>On axis</h1>
+  <svg ref="svgOnAxis"></svg>
 
   <h1>Early reflections</h1>
   <svg ref="svgEarlyReflections"></svg>
@@ -495,16 +526,28 @@ onMounted(() => {
   <h1>Vertical reflections</h1>
   <svg ref="svgVerticalReflections"></svg>
 
+  <h1>Horizontal</h1>
+  <svg ref="svgHorizontal"></svg>
+
+  <h1>Vertical</h1>
+  <svg ref="svgVertical"></svg>
+
+  <h1>Horizontal Normalized</h1>
+  <svg ref="svgHorizontalNormalized"></svg>
+
+  <h1>Vertical Normalized</h1>
+  <svg ref="svgVerticalNormalized"></svg>
+
   <h1>Horizontal contour</h1>
   <svg ref="svgHorizontalContour"></svg>
 
   <h1>Vertical contour</h1>
   <svg ref="svgVerticalContour"></svg>
 
-  <h1>Horizontal contour normalized</h1>
+  <h1>Horizontal Contour Normalized</h1>
   <svg ref="svgHorizontalContourNormalized"></svg>
 
-  <h1>Vertical contour normalized</h1>
+  <h1>Vertical Contour Normalized</h1>
   <svg ref="svgVerticalContourNormalized"></svg>
 </template>
 
