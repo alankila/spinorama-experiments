@@ -1,14 +1,16 @@
 <script setup lang="ts">
 
-import { onMounted, onUnmounted, useTemplateRef } from "vue";
-import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata } from "@/util/spinorama";
+import { onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
+import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata, iirAppliedSpin } from "@/util/spinorama";
 import { useRouter } from "vue-router";
 import { compute_cea2034, estimated_inroom } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
+import { Biquads } from "@/util/iir";
 
 const { speakerId, measurementId } = defineProps<{ speakerId: keyof typeof metadata, measurementId: string }>();
 const router = useRouter();
-const base = router.resolve("/").href + `measurements/${speakerId}/${measurementId}/`;
+
+const applyIir = ref(false);
 
 const svgCea2034 = useTemplateRef("svgCea2034")
 const svgCea2034Normalized = useTemplateRef("svgCea2034Normalized")
@@ -26,34 +28,49 @@ const svgVerticalContour = useTemplateRef("svgVerticalContour")
 const svgHorizontalContourNormalized = useTemplateRef("svgHorizontalContourNormalized")
 const svgVerticalContourNormalized = useTemplateRef("svgVerticalContourNormalized")
 
-let horizontalContour = emptySpinorama;
-let verticalContour = emptySpinorama;
+let horizontalContourOriginal = emptySpinorama;
+let verticalContourOriginal = emptySpinorama;
+let biquads: Biquads | undefined
 try {
-  horizontalContour = await readSpinoramaData(base + "SPL Horizontal.txt")
-  setToMeanOnAxisLevel(horizontalContour);
+  const baseMeasurement = router.resolve("/").href + `measurements/${speakerId}/${measurementId}/`;
+  horizontalContourOriginal = await readSpinoramaData(baseMeasurement + "SPL Horizontal.txt")
+  setToMeanOnAxisLevel(horizontalContourOriginal);
 
-  verticalContour = await readSpinoramaData(base + "SPL Vertical.txt")
-  setToMeanOnAxisLevel(verticalContour);
+  verticalContourOriginal = await readSpinoramaData(baseMeasurement + "SPL Vertical.txt")
+  setToMeanOnAxisLevel(verticalContourOriginal);
 
-  if ("" + horizontalContour.freq != "" + verticalContour.freq) {
+  if ("" + horizontalContourOriginal.freq != "" + verticalContourOriginal.freq) {
     throw new Error("Frequency data mismatch between SPL Horizontal and Vertical!");
   }
+
+  const baseEq = router.resolve("/").href + `eq/${speakerId}/iir-autoeq.txt`;
+  const iirRequest = await fetch(baseEq)
+  const apoConfig = await iirRequest.text()
+  biquads = Biquads.fromApoConfig(apoConfig, 48000)
 }
 catch (error) {
+  console.log(error);
   alert(`The file format for ${speakerId}/${measurementId} is not yet supported: ` + error);
 }
-
-const horizontalContourNormalized = normalizedToOnAxis(horizontalContour);
-const verticalContourNormalized = normalizedToOnAxis(verticalContour);
-
-const cea2034 = compute_cea2034(horizontalContour, verticalContour)
-const cea2034Normalized = compute_cea2034(horizontalContourNormalized, verticalContourNormalized);
-const pir = estimated_inroom(cea2034)
 
 /**
  * Refresh SVGs
  */
 function render() {
+  let horizontalContour = horizontalContourOriginal
+  let verticalContour = verticalContourOriginal
+  if (applyIir.value && biquads) {
+    horizontalContour = iirAppliedSpin(horizontalContourOriginal, biquads)
+    verticalContour = iirAppliedSpin(verticalContourOriginal, biquads)
+  }
+
+  const horizontalContourNormalized = normalizedToOnAxis(horizontalContour);
+  const verticalContourNormalized = normalizedToOnAxis(verticalContour);
+
+  const cea2034 = compute_cea2034(horizontalContour, verticalContour)
+  const cea2034Normalized = compute_cea2034(horizontalContourNormalized, verticalContourNormalized);
+  const pir = estimated_inroom(cea2034)
+
   svgCea2034.value && renderCea2034Plot(svgCea2034.value, cea2034)
   svgCea2034Normalized.value && renderCea2034Plot(svgCea2034Normalized.value, cea2034Normalized)
   svgOnAxis.value && renderFreqPlot(svgOnAxis.value, cea2034, ["On-Axis"], {
@@ -93,10 +110,19 @@ onUnmounted(() => {
   window.removeEventListener("resize", render);
 })
 
+watch(applyIir, render)
+
 </script>
 
 <template>
   <h1 class="title">{{ metadata[speakerId].brand }} {{ metadata[speakerId].model }}</h1>
+
+  <div class="form">
+    <label>
+      <input type="checkbox" v-model="applyIir">
+      Apply recommended auto-iir eq to the measurements
+    </label>
+  </div>
 
   <h1>CEA2034</h1>
   <svg ref="svgCea2034"></svg>
@@ -151,6 +177,9 @@ h1 {
 h1.title {
   font-weight: bold;
   margin-bottom: 1em;
+}
+.form {
+  margin: 0 3em;
 }
 svg {
   background-color: white;

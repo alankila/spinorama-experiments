@@ -157,12 +157,14 @@ export function iirAppliedSpin(spin: SpinoramaData<Spin>, biquads: Biquads) {
   let val = new Map<number, number>()
   for (let k of spin.freq) {
     let xfer = biquads.transfer(k)
-    val.set(k, xfer[0])
+    val.set(k, Math.log(xfer[0]) / Math.log(10) * 20)
   }
 
   for (let data of Object.values(spin.datasets)) {
     data.forEach((v, k) => data.set(k, v + (val.get(k) ?? 0)))
   }
+
+  setToMeanOnAxisLevel(spin)
 
   return spin
 }

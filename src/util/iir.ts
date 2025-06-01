@@ -1,4 +1,5 @@
 import { Complex } from "complex.js";
+import type { moveEmitHelpers } from "typescript";
 
 class Biquad {
     private a1 = 0
@@ -13,6 +14,10 @@ class Biquad {
         this.b0 = b0/a0
         this.b1 = b1/a0
         this.b2 = b2/a0
+    }
+
+    private setPreamp(gain: number) {
+        this.set(1, 0, 0, 10 ** (gain / 20), 0, 0)
     }
 
     private setLP(center_frequency: number, sampling_frequency: number, quality: number) {
@@ -122,7 +127,9 @@ class Biquad {
 
     public static construct(type: string, freq: number, sampling_rate: number, q: number, gain: number) {
         const b = new Biquad()
-        if (type === "APQ" || type === "AP") {
+        if (type === "Preamp") {
+            b.setPreamp(gain)
+        } else if (type === "APQ" || type === "AP") {
             b.setAP(freq, sampling_rate, q)
         } else if (type === "LPQ" || type === "LP") {
             b.setLP(freq, sampling_rate, q)
@@ -166,31 +173,38 @@ export class Biquads {
 
     public static fromApoConfig(apoConfig: string, samplingRate: number) {
         const biquad: Biquad[] = [];
-        const filters = apoConfig.split(/\s+\n/).filter(r => /^Filter\s+(\d+):\s+ON\s+/.exec(r))
+        const filters = apoConfig.split(/\s*\n/).filter(r => /^Filter\s+\d+:\s+ON\s+|^Preamp:\s+/.exec(r))
 
-        for (let row of filters) {
-            let type = row[3]
-            let freq = 0
-            let q = Math.sqrt(2)/2
-            let gain = 0
+        for (let line of filters) {
+            const row = line.split(/\s+/)
+            if (row[0] === "Preamp:" && row[2] === "dB") {                
+                biquad.push(Biquad.construct("Preamp", 0, 0, 0, parseFloat(row[1])));
+            } else if (row[0] === "Filter") {
+                let type = row[3]
+                let freq = 0
+                let q = Math.sqrt(2)/2
+                let gain = 0
 
-            let i = 4
-            while (i < row.length) {
-                if (row[i] == "Fc") {
-                    freq = parseFloat(row[i + 1])
-                    i += 2
-                } else if (row[i] == "Q") {
-                    q = parseFloat(row[i + 1])
-                    i += 2
-                } else if (row[1] == "Gain") {
-                    gain = parseFloat(row[i + 1])
-                    i += 2
-                } else {
-                    console.log("Ignoring command", row[i])
+                let i = 4
+                while (i < row.length) {
+                    if (row[i] == "Fc" && row[i + 2] === "Hz") {
+                        freq = parseFloat(row[i + 1])
+                        i += 3
+                    } else if (row[i] == "Q") {
+                        q = parseFloat(row[i + 1])
+                        i += 2
+                    } else if (row[i] === "Gain" && row[i + 2] === "dB") {
+                        gain = parseFloat(row[i + 1])
+                        i += 3
+                    } else {
+                        throw new Error(`Unhandled eq row: ${line} at ${row[i]}`);
+                    }
                 }
-            }
 
-            biquad.push(Biquad.construct(type, freq, samplingRate, q, gain))
+                biquad.push(Biquad.construct(type, freq, samplingRate, q, gain))
+            } else {
+                throw new Error(`Unhandled eq row: ${line}`);
+            }
         }
 
         return new Biquads(biquad, samplingRate)
