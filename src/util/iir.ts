@@ -161,7 +161,7 @@ export class Biquads {
         for (let biquad of this.biquads) {
             transfer = transfer.mul(biquad.transfer(w0))
         }
-        return transfer.toVector()
+        return [transfer.abs(), transfer.arg()]
     }
 
     public static fromApoConfig(apoConfig: string, samplingRate: number) {
