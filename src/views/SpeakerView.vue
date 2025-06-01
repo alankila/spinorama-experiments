@@ -112,7 +112,7 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
 
       <div class="card">
         <h1>Vertical reflections</h1>
-        <Graph :spin="cea2034" :render="renderFreqPlot" :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Total Horizontal Reflection']" />
+        <Graph :spin="cea2034" :render="renderFreqPlot" :datasets="['Floor Bounce', 'Ceiling Bounce', 'Total Vertical Reflection']" />
       </div>
 
       <div class="card">
