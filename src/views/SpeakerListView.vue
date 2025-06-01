@@ -30,7 +30,7 @@ function flatness(speaker: typeof metadata[keyof typeof metadata]) {
 
   <div class="speakers">
     <div class="card" v-for="[speakerId, speaker] of Object.entries(metadata)">
-      <div><img :src="`pictures/${encodeURI(speakerId)}.webp`"/></div>
+      <div><img loading="lazy" :src="`pictures/${encodeURI(speakerId)}.webp`"/></div>
       <div class="bold">
         {{speaker.brand}} {{speaker.model}}
       </div>
