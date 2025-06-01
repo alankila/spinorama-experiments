@@ -1,12 +1,11 @@
 import { parse } from "papaparse";
 import { sp_weigths } from "./cea2034";
+import _metadata from "@/metadata.json"
 
-export const metadata = (await import("../metadata.json")).default;
+export const metadata = _metadata
 
-export const cea2034NonDi = ["On-Axis", "Listening Window", "Total Early Reflections", "Sound Power"];
-export const cea2034Di = ["Sound Power DI", "Early Reflections DI"];
-
-export type Cea2034Names = "On-Axis" | "Listening Window" | "Total Early Reflections" | "Sound Power" | "Sound Power DI" | "Early Reflections DI";
+export const cea2034NonDi = ["On-Axis", "Listening Window", "Total Early Reflections", "Sound Power"]
+export const cea2034Di = ["Sound Power DI", "Early Reflections DI"]
 
 export type SpinDataset = keyof typeof sp_weigths
 export const spinDataset = Object.keys(sp_weigths)
