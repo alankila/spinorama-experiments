@@ -1,7 +1,7 @@
 <script setup lang="ts">
 
 import { onMounted, onUnmounted, useTemplateRef } from "vue";
-import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, type SpinoramaDualAxisSpin, emptySpinorama, metadata } from "@/util/spinorama";
+import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata, type SpinoramaData } from "@/util/spinorama";
 import { useRouter } from "vue-router";
 import { compute_cea2034, estimated_inroom } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
@@ -26,8 +26,8 @@ const svgVerticalContour = useTemplateRef("svgVerticalContour")
 const svgHorizontalContourNormalized = useTemplateRef("svgHorizontalContourNormalized")
 const svgVerticalContourNormalized = useTemplateRef("svgVerticalContourNormalized")
 
-let horizontalContour: SpinoramaDualAxisSpin
-let verticalContour: SpinoramaDualAxisSpin
+let horizontalContour: SpinoramaData
+let verticalContour: SpinoramaData
 try {
   horizontalContour = await readSpinoramaData(base + "SPL Horizontal.txt")
   setToMeanOnAxisLevel(horizontalContour);
