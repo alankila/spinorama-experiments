@@ -1,12 +1,12 @@
 <script setup lang="ts">
 
 import { onMounted, onUnmounted, useTemplateRef } from "vue";
-import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, type SpinoramaData, emptySpinorama } from "@/util/spinorama";
+import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, type SpinoramaData, emptySpinorama, metadata } from "@/util/spinorama";
 import { useRouter } from "vue-router";
 import { compute_cea2034, estimated_inroom } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
 
-const { speakerId, measurementId } = defineProps<{ speakerId: string, measurementId: string }>();
+const { speakerId, measurementId } = defineProps<{ speakerId: keyof typeof metadata, measurementId: string }>();
 const router = useRouter();
 const base = router.resolve("/").href + `measurements/${speakerId}/${measurementId}/`;
 
@@ -89,6 +89,8 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <h1 class="title">{{ metadata[speakerId].brand }} {{ metadata[speakerId].model }}</h1>
+
   <h1>CEA2034</h1>
   <svg ref="svgCea2034"></svg>
 
@@ -136,10 +138,17 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+h1 {
+  text-align: center;
+}
+h1.title {
+  font-weight: bold;
+  margin-bottom: 1em;
+}
 svg {
   background-color: white;
   color: black;
   width: 100%;
-  margin: 1em;
+  padding: 1em;
 }
 </style>

@@ -5,7 +5,7 @@ import { cea2034Di, cea2034NonDi, type SpinoramaData } from "./spinorama"
 
 /* Chart dimensions etc. */
 const aspectRatio = 2
-const marginTop = 40
+const marginTop = 8
 const marginRight = 40
 const marginBottom = 40
 const marginLeft = 40
@@ -105,12 +105,6 @@ export function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datas
     .attr("d", line([[300, predictor.predict(Math.log2(300)) + 3], [5000, predictor.predict(Math.log2(5000)) + 3]]))
   }
 
-  graph.append("text")
-  .attr("x", width / 2)
-  .attr("y", marginTop/2)
-  .attr("text-anchor", "middle")
-  .text(dataset.title)
-
   /* x axis ticks */
   graph.append("g")
   .attr("transform", `translate(0, ${height - marginBottom})`)
@@ -118,6 +112,8 @@ export function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datas
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
     .attr("y2", -height + marginTop + marginBottom))
+  .call(g => g.selectAll(".tick text")
+  .attr("font-size", 16))
 
   /* y axis ticks */
   graph.append("g")
@@ -126,6 +122,8 @@ export function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datas
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
     .attr("x2", width - marginLeft - marginRight))
+  .call(g => g.selectAll(".tick text")
+  .attr("font-size", 16))
   
   let serie = graph.append("g")
   .selectAll("g")
@@ -178,12 +176,6 @@ export function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
   .x(d => x(d[0]))
   .y(d => yRight(d[1]))
 
-  graph.append("text")
-  .attr("x", width / 2)
-  .attr("y", marginTop / 2)
-  .attr("text-anchor", "middle")
-  .text(dataset.title)
-
   /* x axis ticks */
   graph.append("g")
   .attr("transform", `translate(0, ${height - marginBottom})`)
@@ -191,6 +183,8 @@ export function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
     .attr("y2", -height + marginTop + marginBottom))
+  .call(g => g.selectAll(".tick text")
+  .attr("font-size", 16))
 
   /* y axis ticks */
   graph.append("g")
@@ -199,10 +193,14 @@ export function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
     .attr("x2", width - marginLeft - marginRight))
+  .call(g => g.selectAll(".tick text")
+  .attr("font-size", 16))
 
   graph.append("g")
   .attr("transform", `translate(${width - marginRight},0)`)
   .call(d3.axisRight(yRight).ticks(height / 200))
+  .call(g => g.selectAll(".tick text")
+  .attr("font-size", 16))
 
   let serieLeft = graph.append("g")
   .selectAll("g")
@@ -288,12 +286,6 @@ export function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
   const path = d3.geoPath().projection(d3.geoIdentity().scale(width / dataW))
   const contours = d3.contours().size([dataW, dataH])
   
-  graph.append("text")
-  .attr("x", width / 2)
-  .attr("y", marginTop / 2)
-  .attr("text-anchor", "middle")
-  .text(ds.title)
-
   graph.append("g")
   .attr("transform", `translate(${marginLeft},${marginTop}) scale(${(width - marginLeft - marginRight) / width}, ${(height - marginTop - marginBottom) / contourNaturalHeight})`)
   .attr("stroke-opacity", 0.3)
@@ -312,6 +304,8 @@ export function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
     .attr("y2", -height + marginTop + marginBottom))
+  .call(g => g.selectAll(".tick text")
+  .attr("font-size", 16))
 
   /* y axis ticks */
   graph.append("g")
@@ -320,4 +314,6 @@ export function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
     .attr("x2", width - marginLeft - marginRight))
+  .call(g => g.selectAll(".tick text")
+  .attr("font-size", 16))
 }
