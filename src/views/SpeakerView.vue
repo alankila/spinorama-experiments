@@ -1,7 +1,7 @@
 <script setup lang="ts">
 
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
-import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata, iirAppliedSpin } from "@/util/spinorama";
+import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata, iirAppliedSpin as iirApplied } from "@/util/spinorama";
 import { useRouter } from "vue-router";
 import { compute_cea2034 as computeCea2034, estimated_inroom as estimateInRoom } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
@@ -12,6 +12,7 @@ const { speakerId, measurementId } = defineProps<{ speakerId: keyof typeof metad
 const router = useRouter();
 
 const applyIir = ref(false);
+const showNormalized = ref(false);
 
 let horizontalContourOriginal = emptySpinorama;
 let verticalContourOriginal = emptySpinorama;
@@ -39,13 +40,26 @@ catch (error) {
 }
 
 /* Not affected by eq, so cached as-is */
-const horizontalContourNormalized = normalizedToOnAxis(horizontalContourOriginal);
-const verticalContourNormalized = normalizedToOnAxis(verticalContourOriginal);
-const cea2034Normalized = computeCea2034(horizontalContourNormalized, verticalContourNormalized)
+const horizontalContour = computed(() => {
+  if (showNormalized.value) {
+    return normalizedToOnAxis(horizontalContourOriginal);
+  } else if (biquads && applyIir.value) {
+    return iirApplied(horizontalContourOriginal, biquads);
+  } else {
+    return horizontalContourOriginal;
+  }
+});
 
-/* Dynamic bits affected by eq */
-const horizontalContour = computed(() => biquads && applyIir.value ? iirAppliedSpin(horizontalContourOriginal, biquads) : horizontalContourOriginal)
-const verticalContour = computed(() => biquads && applyIir.value ? iirAppliedSpin(verticalContourOriginal, biquads) : verticalContourOriginal)
+const verticalContour = computed(() => {
+  if (showNormalized.value) {
+    return normalizedToOnAxis(verticalContourOriginal);
+  } else if (biquads && applyIir.value) {
+    return iirApplied(verticalContourOriginal, biquads);
+  } else {
+    return verticalContourOriginal;
+  }
+});
+
 const cea2034 = computed(() => computeCea2034(horizontalContour.value, verticalContour.value))
 const pir = computed(() => estimateInRoom(cea2034.value))
 
@@ -60,7 +74,12 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
     <div class="form">
       <label>
         <input type="checkbox" v-model="applyIir">
-        Apply recommended auto-iir eq to the measurements
+        Apply recommended auto-iir equalizer to the measurement
+      </label>
+
+      <label>
+        <input type="checkbox" v-model="showNormalized">
+        Normalize measurements to On-Axis response level
       </label>
     </div>
 
@@ -71,20 +90,13 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
       </div>
 
       <div class="card">
-        <h1>CEA2034 Normalized</h1>
-        <Graph :spin="cea2034Normalized" :render="renderCea2034Plot" :datasets="[]" />
-      </div>
-
-      <div class="card">
         <h1>On axis</h1>
-        <Graph :spin="cea2034" :render="renderCea2034Plot" :datasets="['On-Axis']"
-          :regression="{ min: 100, max: 12000 }" />
+        <Graph :spin="cea2034" :render="renderFreqPlot" :datasets="['On-Axis']" :regression="{ min: 100, max: 12000 }" />
       </div>
 
       <div class="card">
         <h1>Early reflections</h1>
-        <Graph :spin="cea2034" :render="renderFreqPlot"
-          :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Floor Bounce', 'Ceiling Bounce', 'Total Early Reflections']" />
+        <Graph :spin="cea2034" :render="renderFreqPlot" :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Floor Bounce', 'Ceiling Bounce', 'Total Early Reflections']" />
       </div>
 
       <div class="card">
@@ -95,14 +107,12 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
 
       <div class="card">
         <h1>Horizontal reflections</h1>
-        <Graph :spin="cea2034" :render="renderFreqPlot"
-          :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Total Horizontal Reflection']" />
+        <Graph :spin="cea2034" :render="renderFreqPlot" :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Total Horizontal Reflection']" />
       </div>
 
       <div class="card">
         <h1>Vertical reflections</h1>
-        <Graph :spin="cea2034" :render="renderFreqPlot"
-          :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Total Horizontal Reflection']" />
+        <Graph :spin="cea2034" :render="renderFreqPlot" :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Total Horizontal Reflection']" />
       </div>
 
       <div class="card">
@@ -116,16 +126,6 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
       </div>
 
       <div class="card">
-        <h1>Horizontal Normalized</h1>
-        <Graph :spin="horizontalContourNormalized" :render="renderFreqPlot" :datasets="directivityAngles" />
-      </div>
-
-      <div class="card">
-        <h1>Vertical Normalized</h1>
-        <Graph :spin="verticalContourNormalized" :render="renderFreqPlot" :datasets="directivityAngles" />
-      </div>
-
-      <div class="card">
         <h1>Horizontal contour</h1>
         <Graph :spin="horizontalContour" :render="renderContour" :datasets="[]" />
       </div>
@@ -134,16 +134,6 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
         <h1>Vertical contour</h1>
         <Graph :spin="verticalContour" :render="renderContour" :datasets="[]" />
       </div>
-
-      <div class="card">
-        <h1>Horizontal Contour Normalized</h1>
-        <Graph :spin="horizontalContourNormalized" :render="renderContour" :datasets="[]" />
-      </div>
-
-      <div class="card">
-        <h1>Vertical Contour Normalized</h1>
-        <Graph :spin="verticalContourNormalized" :render="renderContour" :datasets="[]" />
-      </div>
     </div>
   </div>
 </template>
@@ -151,39 +141,51 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
 <style scoped>
 
 div.measurement {
-  padding: 1em;
+  display: grid;
+  grid-template-areas: "title form" "content content";
+  grid-template-columns: minmax(max-content, 1fr) 1fr;
+  grid-template-rows: max-content 1fr;
+  max-height: 100vh;
+  gap: 1em;
 }
 
 h1 {
+  grid-area: title;
   text-align: center;
+  padding: 0.5em;
 }
 
 h1.title {
   font-weight: bold;
-  margin-bottom: 1em;
+  align-self: center;
 }
 
 .form {
-  margin: 0 3em;
-}
-
-svg {
-  width: 100%;
+  grid-area: form;
+  display: grid;
+  gap: 0.25em;
+  align-self: center;
 }
 
 .card-container {
+  grid-area: content;
+  border-top: 1px solid black;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1200px));
   gap: 1em;
-  margin: auto;
+  overflow-y: scroll;
+  padding: 1em;
 }
 
 .card {
-  display: grid;
-  grid-template-rows: max-content 1fr;
   border: 1px solid black;
   border-radius: 1em;
   box-shadow: 0px 0.5em 1em rgba(0, 0, 0, 0.3);
-  overflow: hidden;
+  height: content;
 }
+
+.card svg {
+  width: 100%;
+}
+
 </style>
