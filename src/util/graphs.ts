@@ -295,7 +295,7 @@ export function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
 
   graph.append("g")
   .attr("transform", `translate(${marginLeft},${marginTop}) scale(${(width - marginLeft - marginRight) / width}, ${(height - marginTop - marginBottom) / contourNaturalHeight})`)
-  .attr("stroke-opacity", 0.5)
+  .attr("stroke-opacity", 0.3)
   .attr("stroke", "black")
   .selectAll()
   .data(color.ticks(12))

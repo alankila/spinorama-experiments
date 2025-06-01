@@ -285,12 +285,13 @@ export function compute_cea2034(horizSpin: SpinoramaData, vertSpin: SpinoramaDat
     const lw = listening_window(horizSpin, vertSpin)
     const sp = sound_power(horizSpin, vertSpin)
     const er = early_reflections(horizSpin, vertSpin)
+    let terIdx = er.datasets.indexOf("Total Early Reflections")
 
     const erdi: SpinoramaData = {
         title: "Early Reflections DI",
         datasets: ["Early Reflections DI", ""],
         headers: ["Hz", "dB"],
-        data: merge([lw.data, er.data]).map((p: any) => [p[0], p[1] - p[3]]),
+        data: merge([lw.data, er.data]).map((p: any) => [p[0], p[1] - p[2 + terIdx + 1]]),
     }
 
     /*
