@@ -2,15 +2,85 @@
 
 import { metadata } from '@/util/spinorama';
 
+function tonalityScore(speaker: typeof metadata[keyof typeof metadata]) {
+  // @ts-ignore
+  const measurement = speaker.measurements[speaker.default_measurement]?.pref_rating
+  if (!measurement) {
+    return undefined
+  }
+  /* FIXME: this is wrong */
+  return (12.69 - 2.49 * measurement.nbd_on_axis - 2.99 * measurement.nbd_pred_in_room - 4.31 * measurement.lfq + 2.32 * measurement.sm_pred_in_room).toFixed(1)
+}
+
+function bassExtension(speaker: typeof metadata[keyof typeof metadata]) {
+  // @ts-ignore
+  const measurement = speaker.measurements[speaker.default_measurement]?.pref_rating
+  return measurement?.lfx_hz
+}
+
+function flatness(speaker: typeof metadata[keyof typeof metadata]) {
+  // @ts-ignore
+  const measurement = speaker.measurements[speaker.default_measurement]?.pref_rating
+  /* FIXME: this is wrong */
+  return measurement?.aad_on_axis.toFixed(1)
+}
+
 </script>
 
 <template>
 
-  <div v-for="[speakerId, speaker] of Object.entries(metadata)">
-    <div v-for="measurementId of Object.keys(speaker.measurements)">
-      <RouterLink :to="`view/${encodeURI(speakerId)}/${encodeURI(measurementId)}`">{{ speakerId }} ({{ measurementId }})</RouterLink>
+  <div class="speakers">
+    <div class="card" v-for="[speakerId, speaker] of Object.entries(metadata)">
+      <div><img :src="`/pictures/${speakerId}.webp`"/></div>
+      <div class="heading">
+        {{speaker.brand}} {{speaker.model}}
+      </div>
+      <div>
+        Price: {{speaker.price}} $<br/>
+        Tonality: {{ tonalityScore(speaker) }}<br/>
+        Bass extension: {{ bassExtension(speaker) }} Hz<br/>
+        Flatness: {{ flatness(speaker) }} dB</br>
+      </div>
+      <div class="link"><RouterLink :to="`view/${encodeURI(speakerId)}/${encodeURI(speaker.default_measurement)}`">{{ speaker.default_measurement }}</RouterLink></div>
     </div>
   </div>
 
 </template>
 
+<style scoped>
+
+.speakers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, 400px);
+  gap: 1em;
+}
+
+.card {
+  padding: 0 0 1em 0;
+  border-radius: 0.5em;
+  box-shadow: 0px 0.5em 1em rgba(0, 0, 0, 0.3);
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  grid-template-rows: 1fr;
+  grid-auto-rows: max-content;
+  gap: 0.5em;
+}
+
+.card img {
+  max-width: 400px;
+  max-height: 600px;
+}
+
+.card .heading {
+  font-weight: bold;
+}
+
+.link {
+  border-top: 1px solid #ccc;
+  padding-top: 0.5em;
+  width: 100%;
+  text-align: center;
+}
+
+</style>
