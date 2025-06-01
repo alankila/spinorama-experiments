@@ -54,76 +54,136 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
 </script>
 
 <template>
-  <h1 class="title">{{ metadata[speakerId].brand }} {{ metadata[speakerId].model }}</h1>
+  <div class="measurement">
+    <h1 class="title">{{ metadata[speakerId].brand }} {{ metadata[speakerId].model }}</h1>
 
-  <div class="form">
-    <label>
-      <input type="checkbox" v-model="applyIir">
-      Apply recommended auto-iir eq to the measurements
-    </label>
+    <div class="form">
+      <label>
+        <input type="checkbox" v-model="applyIir">
+        Apply recommended auto-iir eq to the measurements
+      </label>
+    </div>
+
+    <div class="card-container">
+      <div class="card">
+        <h1>CEA2034</h1>
+        <Graph :spin="cea2034" :render="renderCea2034Plot" :datasets="[]" />
+      </div>
+
+      <div class="card">
+        <h1>CEA2034 Normalized</h1>
+        <Graph :spin="cea2034Normalized" :render="renderCea2034Plot" :datasets="[]" />
+      </div>
+
+      <div class="card">
+        <h1>On axis</h1>
+        <Graph :spin="cea2034" :render="renderCea2034Plot" :datasets="['On-Axis']"
+          :regression="{ min: 100, max: 12000 }" />
+      </div>
+
+      <div class="card">
+        <h1>Early reflections</h1>
+        <Graph :spin="cea2034" :render="renderFreqPlot"
+          :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Floor Bounce', 'Ceiling Bounce', 'Total Early Reflections']" />
+      </div>
+
+      <div class="card">
+        <h1>Estimated In-Room Response</h1>
+        <Graph :spin="pir" :render="renderFreqPlot" :datasets="['Estimated In-Room']"
+          :regression="{ min: 100, max: 12000 }" />
+      </div>
+
+      <div class="card">
+        <h1>Horizontal reflections</h1>
+        <Graph :spin="cea2034" :render="renderFreqPlot"
+          :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Total Horizontal Reflection']" />
+      </div>
+
+      <div class="card">
+        <h1>Vertical reflections</h1>
+        <Graph :spin="cea2034" :render="renderFreqPlot"
+          :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Total Horizontal Reflection']" />
+      </div>
+
+      <div class="card">
+        <h1>Horizontal</h1>
+        <Graph :spin="horizontalContour" :render="renderFreqPlot" :datasets="directivityAngles" />
+      </div>
+
+      <div class="card">
+        <h1>Vertical</h1>
+        <Graph :spin="verticalContour" :render="renderFreqPlot" :datasets="directivityAngles" />
+      </div>
+
+      <div class="card">
+        <h1>Horizontal Normalized</h1>
+        <Graph :spin="horizontalContourNormalized" :render="renderFreqPlot" :datasets="directivityAngles" />
+      </div>
+
+      <div class="card">
+        <h1>Vertical Normalized</h1>
+        <Graph :spin="verticalContourNormalized" :render="renderFreqPlot" :datasets="directivityAngles" />
+      </div>
+
+      <div class="card">
+        <h1>Horizontal contour</h1>
+        <Graph :spin="horizontalContour" :render="renderContour" :datasets="[]" />
+      </div>
+
+      <div class="card">
+        <h1>Vertical contour</h1>
+        <Graph :spin="verticalContour" :render="renderContour" :datasets="[]" />
+      </div>
+
+      <div class="card">
+        <h1>Horizontal Contour Normalized</h1>
+        <Graph :spin="horizontalContourNormalized" :render="renderContour" :datasets="[]" />
+      </div>
+
+      <div class="card">
+        <h1>Vertical Contour Normalized</h1>
+        <Graph :spin="verticalContourNormalized" :render="renderContour" :datasets="[]" />
+      </div>
+    </div>
   </div>
-
-  <h1>CEA2034</h1>
-  <Graph :spin="cea2034" :render="renderCea2034Plot" :datasets="[]"/>
-
-  <h1>CEA2034 Normalized</h1>
-  <Graph :spin="cea2034Normalized" :render="renderCea2034Plot" :datasets="[]"/>
-
-  <h1>On axis</h1>
-  <Graph :spin="cea2034" :render="renderCea2034Plot" :datasets="['On-Axis']" :regression="{ min: 100, max: 12000 }"/>
-
-  <h1>Early reflections</h1>
-  <Graph :spin="cea2034" :render="renderFreqPlot" :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Floor Bounce', 'Ceiling Bounce', 'Total Early Reflections']"/>
-
-  <h1>Estimated In-Room Response</h1>
-  <Graph :spin="pir" :render="renderFreqPlot" :datasets="['Estimated In-Room']" :regression="{ min: 100, max: 12000 }"/>
-
-  <h1>Horizontal reflections</h1>
-  <Graph :spin="cea2034" :render="renderFreqPlot" :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Total Horizontal Reflection']" />
-
-  <h1>Vertical reflections</h1>
-  <Graph :spin="cea2034" :render="renderFreqPlot" :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Total Horizontal Reflection']" />
-
-  <h1>Horizontal</h1>
-  <Graph :spin="horizontalContour" :render="renderFreqPlot" :datasets="directivityAngles" />
-
-  <h1>Vertical</h1>
-  <Graph :spin="verticalContour" :render="renderFreqPlot" :datasets="directivityAngles" />
-
-  <h1>Horizontal Normalized</h1>
-  <Graph :spin="horizontalContourNormalized" :render="renderFreqPlot" :datasets="directivityAngles" />
-
-  <h1>Vertical Normalized</h1>
-  <Graph :spin="verticalContourNormalized" :render="renderFreqPlot" :datasets="directivityAngles" />
-
-  <h1>Horizontal contour</h1>
-  <Graph :spin="horizontalContour" :render="renderContour" :datasets="[]" />
-
-  <h1>Vertical contour</h1>
-  <Graph :spin="verticalContour" :render="renderContour" :datasets="[]" />
-
-  <h1>Horizontal Contour Normalized</h1>
-  <Graph :spin="horizontalContourNormalized" :render="renderContour" :datasets="[]" />
-
-  <h1>Vertical Contour Normalized</h1>
-  <Graph :spin="verticalContourNormalized" :render="renderContour" :datasets="[]" />
 </template>
 
 <style scoped>
+
+div.measurement {
+  padding: 1em;
+}
+
 h1 {
   text-align: center;
 }
+
 h1.title {
   font-weight: bold;
   margin-bottom: 1em;
 }
+
 .form {
   margin: 0 3em;
 }
+
 svg {
-  background-color: white;
-  color: black;
   width: 100%;
-  padding: 1em;
+}
+
+.card-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1200px));
+  gap: 1em;
+  margin: auto;
+}
+
+.card {
+  display: grid;
+  grid-template-rows: max-content 1fr;
+  border: 1px solid black;
+  border-radius: 1em;
+  box-shadow: 0px 0.5em 1em rgba(0, 0, 0, 0.3);
+  overflow: hidden;
 }
 </style>

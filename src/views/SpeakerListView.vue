@@ -64,6 +64,7 @@ function flatness(speaker: typeof metadata[keyof typeof metadata]) {
   grid-template-rows: 1fr;
   grid-auto-rows: max-content;
   gap: 0.5em;
+  overflow: hidden;
 }
 
 .card img {

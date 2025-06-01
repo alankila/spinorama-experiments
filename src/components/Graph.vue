@@ -2,7 +2,7 @@
 
 import type { GraphType } from '@/util/graphs';
 import type { SpinoramaData } from '@/util/spinorama';
-import { onMounted, onUnmounted, useTemplateRef, watchEffect } from 'vue';
+import { onMounted, onUnmounted, ref, useTemplateRef, watchEffect } from 'vue';
 
 const svg = useTemplateRef("svg")
 
@@ -13,21 +13,31 @@ const { render, spin, datasets, regression } = defineProps<{
   regression?: { min: number, max: number },
 }>()
 
+const refreshCounter = ref(1);
+let renderedWidth = -1;
+
 /**
  * Refresh SVGs
  */
-function refresh() {
-  watchEffect(() => svg.value && render(svg.value, spin, datasets, regression));
+watchEffect(() => {
+  if (svg.value && refreshCounter.value) {
+    render(svg.value, spin, datasets, regression)
+    renderedWidth = refreshCounter.value
+  }
+});
+
+{
+  function refresh() {
+    refreshCounter.value += 1
+  }
+
+  onMounted(() => {
+    window.addEventListener("resize", ev => refreshCounter.value += renderedWidth != svg.value?.getBoundingClientRect().width ? 1 : 0)
+  })
+  onUnmounted(() => {
+    window.removeEventListener("resize", refresh);
+  })
 }
-
-onMounted(refresh);
-
-onMounted(() => {
-  window.addEventListener("resize", refresh)
-})
-onUnmounted(() => {
-  window.removeEventListener("resize", refresh);
-})
 
 </script>
 
