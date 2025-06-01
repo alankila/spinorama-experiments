@@ -2,7 +2,7 @@
  * Porting spinorama's CEA2034 computation here from Pierre Aubert
  */
 
-import type { SpinDataset, SpinoramaData } from "./spinorama"
+import type { SpinoramaDualAxisSpin, SpinoramaCEA2034 } from "./spinorama"
 
 /**
  * Combine multiple datasets into single dataset
@@ -58,7 +58,6 @@ const std_weigths = compute_weigths()
 export const sp_weigths = {
     "On-Axis": std_weigths[0],
     "180°": std_weigths[0],
-    /*"-180°": std_weigths[0],*/
 
     "10°": std_weigths[1],
     "170°": std_weigths[1],
@@ -118,7 +117,7 @@ function pressure2spl(pressure: number) {
  * Compute the spatial average of pressure with a function.
  * Provide list of dataset names to average and whether spatial weighting factors should be applied.
  */
-function spatial_average(spins: SpinoramaData[], datasetFilter: (spin: SpinoramaData, name: string) => boolean, spatially_weighted: boolean) {
+function spatial_average(spins: SpinoramaDualAxisSpin[], datasetFilter: (spin: SpinoramaDualAxisSpin, name: string) => boolean, spatially_weighted: boolean) {
     const result = new Map<number, [number, number]>()
     for (let x of spins[0].freq) {
         result.set(x, [0, 0])
@@ -137,7 +136,7 @@ function spatial_average(spins: SpinoramaData[], datasetFilter: (spin: Spinorama
                     throw new Error(`Something wrong, unexpected frequency ${res}`)
                 }
 
-                const weight = spatially_weighted ? sp_weigths[d as SpinDataset] ?? (() => { throw new Error(`Expected to find dataset ${d}`) })() : 1;
+                const weight = spatially_weighted ? sp_weigths[d as keyof typeof sp_weigths] ?? (() => { throw new Error(`Expected to find dataset ${d}`) })() : 1;
                 res[0] += spl2pressure(data[1]) ** 2 * weight
                 res[1] += weight
             }
@@ -171,15 +170,15 @@ function spatial_average(spins: SpinoramaData[], datasetFilter: (spin: Spinorama
  * @param horizSpin 
  * @param vertSpin 
  */
-function sound_power(horizSpin: SpinoramaData, vertSpin: SpinoramaData) {
-    return spatial_average([horizSpin, vertSpin], (spin: SpinoramaData, name: string) => {
+function sound_power(horizSpin: SpinoramaDualAxisSpin, vertSpin: SpinoramaDualAxisSpin) {
+    return spatial_average([horizSpin, vertSpin], (spin: SpinoramaDualAxisSpin, name: string) => {
         return !(spin == vertSpin && (name == 'On Axis' || name == '180°'))
     }, true)
 }
 
 /** Compute the Listening Window (LW) from the SPL horizontal and vertical */
-function listening_window(horizSpin: SpinoramaData, vertSpin: SpinoramaData) {
-    return spatial_average([horizSpin, vertSpin], (spin: SpinoramaData, name: string) => {
+function listening_window(horizSpin: SpinoramaDualAxisSpin, vertSpin: SpinoramaDualAxisSpin) {
+    return spatial_average([horizSpin, vertSpin], (spin: SpinoramaDualAxisSpin, name: string) => {
         return (spin == horizSpin && ["10°", "20°", "30°", "-10°", "-20°", "-30°"].indexOf(name) !== -1)
         || (spin == vertSpin && ["On Axis", "10°", "-10°"].indexOf(name) !== -1)
     }, false);
@@ -201,7 +200,7 @@ function listening_window(horizSpin: SpinoramaData, vertSpin: SpinoramaData) {
  * @param cea2034 
  * @returns Estimated in-room response
  */
-export function estimated_inroom(cea2034: SpinoramaData & { datasets: { "Listening Window": Map<number, number>, "Total Early Reflections": Map<number, number>, "Sound Power": Map<number, number> }}) {
+export function estimated_inroom(cea2034: SpinoramaCEA2034) {
     let lw = cea2034.datasets["Listening Window"]
     let er = cea2034.datasets["Total Early Reflections"]
     let sp = cea2034.datasets["Sound Power"]
@@ -224,7 +223,7 @@ export function estimated_inroom(cea2034: SpinoramaData & { datasets: { "Listeni
 /** 
  * Compute the Early Reflections from the SPL horizontal and vertical
  */
-function early_reflections(horizSpin: SpinoramaData, vertSpin: SpinoramaData) {
+function early_reflections(horizSpin: SpinoramaDualAxisSpin, vertSpin: SpinoramaDualAxisSpin) {
     const floorBounce = spatial_average([vertSpin], (_, name: string) => ["-20°", "-30°", "-40°"].indexOf(name) !== -1, false)
     const ceilingBounce = spatial_average([vertSpin], (_, name: string) => ["40°", "50°", "60°"].indexOf(name) !== -1, false)
     const frontWallBounce = spatial_average([horizSpin], (_, name: string) => ["On Axis", "10°", "20°", "30°", "-10°", "-20°", "-30°"].indexOf(name) !== -1, false)
@@ -255,7 +254,7 @@ function early_reflections(horizSpin: SpinoramaData, vertSpin: SpinoramaData) {
  * Compute On Axis depending of which kind of data we have.
  * Likely best to average the horizontal and vertical measurements?
  */
-function compute_onaxis(horizSpin: SpinoramaData, vertSpin: SpinoramaData) {
+function compute_onaxis(horizSpin: SpinoramaDualAxisSpin, vertSpin: SpinoramaDualAxisSpin) {
     return spatial_average([horizSpin, vertSpin], (_, name) => name === "On-Axis", false)
 }
 
@@ -266,7 +265,7 @@ function compute_onaxis(horizSpin: SpinoramaData, vertSpin: SpinoramaData) {
  * @param vertSpin 
  * @returns 
  */
-export function compute_cea2034(horizSpin: SpinoramaData, vertSpin: SpinoramaData) {
+export function compute_cea2034(horizSpin: SpinoramaDualAxisSpin, vertSpin: SpinoramaDualAxisSpin) {
     const onaxis = compute_onaxis(horizSpin, vertSpin)
     const lw = listening_window(horizSpin, vertSpin)
     const sp = sound_power(horizSpin, vertSpin)

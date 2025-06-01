@@ -7,20 +7,38 @@ export const metadata = _metadata
 export const cea2034NonDi = ["On-Axis", "Listening Window", "Total Early Reflections", "Sound Power"]
 export const cea2034Di = ["Sound Power DI", "Early Reflections DI"]
 
-export type SpinDataset = keyof typeof sp_weigths
-export const spinDataset = Object.keys(sp_weigths)
-
-export interface SpinoramaData {
+export interface SpinoramaDualAxisSpin {
   freq: number[],
   datasets: {
-    [dataset: string]: Map<number, number>,
+    [key: string]: Map<number, number>
+  },
+}
+
+export interface SpinoramaCEA2034 {
+  freq: number[],
+  datasets: {
+    "On-Axis": Map<number, number>,
+    "Listening Window": Map<number, number>,
+    "Sound Power": Map<number, number>,
+    "Early Reflections DI": Map<number, number>,
+    "Sound Power DI": Map<number, number>,
+    "Front Wall Bounce": Map<number, number>,
+    "Side Wall Bounce": Map<number, number>,
+    "Rear Wall Bounce": Map<number, number>
+    "Floor Bounce": Map<number, number>,
+    "Ceiling Bounce": Map<number, number>,
+    "Total Horizontal Reflection": Map<number, number>,
+    "Total Vertical Reflection": Map<number, number>,
+    "Total Early Reflections": Map<number, number>,
   },
 }
 
 /* Placeholder that shows a flat line */
-export const emptySpinorama: SpinoramaData = {
+export const emptySpinorama: SpinoramaDualAxisSpin = {
   freq: [20, 20000],
-  datasets: {},
+  datasets: {
+    "180°": new Map(),
+  },
 }
 for (let k of Object.keys(sp_weigths)) {
   const map = new Map()
@@ -30,14 +48,14 @@ for (let k of Object.keys(sp_weigths)) {
   emptySpinorama.datasets[k] = map
 }
 
-function cloneSpinorama(data: SpinoramaData) {
+function cloneSpinorama(data: SpinoramaDualAxisSpin): SpinoramaDualAxisSpin {
   return {
     freq: [...data.freq],
     datasets: Object.fromEntries(Object.entries(data.datasets).map(p => [p[0], new Map([...p[1].entries()])]))
   }
 }
 
-export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
+export async function readSpinoramaData(url: string): Promise<SpinoramaDualAxisSpin> {
   const graphResult = await fetch(encodeURI(url))
   if (graphResult.status != 200) {
     throw new Error(`Unable to find data: ${url}: ${graphResult.status} ${graphResult.statusText}`)
@@ -66,14 +84,14 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
    * Data rows are formatted in U.S. numeric format with thousands separator,
    * e.g. 1,234.56.
    */
-  const output: SpinoramaData = {
+  const output: SpinoramaDualAxisSpin = {
     freq: [],
     datasets: {},
   }
 
   for (let d of datasets) {
     if (d) {
-      if (spinDataset.indexOf(d) === -1) {
+      if (!(d in sp_weigths)) {
         throw new Error(`Unsupported dataset in ${url}: ${d}`)
       }
       output.datasets[d] = new Map()
@@ -103,6 +121,13 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
     }
   }
 
+  /* Ensure that all datasets are in fact present */
+  for (let ds of Object.keys(sp_weigths)) {
+    if (!output.datasets[ds]) {
+      throw new Error(`Missing a dataset: ${ds}`)
+    }
+  }  
+
   /* Ensure frequencies appear in ascending order */
   output.freq.sort((a, b) => a - b)
 
@@ -114,7 +139,7 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
  *
  * @param spin 
  */
-export function setToMeanOnAxisLevel(spin: SpinoramaData) {
+export function setToMeanOnAxisLevel(spin: SpinoramaDualAxisSpin) {
   let ds = spin.datasets["On-Axis"]
 
   let avg = 0;
@@ -138,7 +163,7 @@ export function setToMeanOnAxisLevel(spin: SpinoramaData) {
  * @param spin 
  * @returns new spin with relative levels to On-Axis measurement
  */
-export function normalizedToOnAxis(spin: SpinoramaData) {
+export function normalizedToOnAxis(spin: SpinoramaDualAxisSpin) {
   spin = cloneSpinorama(spin)
 
   let onAxis = spin.datasets["On-Axis"]

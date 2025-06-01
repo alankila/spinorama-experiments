@@ -1,7 +1,7 @@
 <script setup lang="ts">
 
 import { onMounted, onUnmounted, useTemplateRef } from "vue";
-import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, type SpinoramaData, emptySpinorama, metadata } from "@/util/spinorama";
+import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, type SpinoramaDualAxisSpin, emptySpinorama, metadata } from "@/util/spinorama";
 import { useRouter } from "vue-router";
 import { compute_cea2034, estimated_inroom } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
@@ -26,8 +26,8 @@ const svgVerticalContour = useTemplateRef("svgVerticalContour")
 const svgHorizontalContourNormalized = useTemplateRef("svgHorizontalContourNormalized")
 const svgVerticalContourNormalized = useTemplateRef("svgVerticalContourNormalized")
 
-let horizontalContour: SpinoramaData
-let verticalContour: SpinoramaData
+let horizontalContour: SpinoramaDualAxisSpin
+let verticalContour: SpinoramaDualAxisSpin
 try {
   horizontalContour = await readSpinoramaData(base + "SPL Horizontal.txt")
   setToMeanOnAxisLevel(horizontalContour);
@@ -39,7 +39,7 @@ try {
   }
 }
 catch (error) {
-  alert(`The file format for ${speakerId}/${measurementId} is not yet supported.`);
+  alert(`The file format for ${speakerId}/${measurementId} is not yet supported: ` + error);
   horizontalContour = verticalContour = emptySpinorama
 }
 
@@ -60,7 +60,7 @@ function render() {
 
   svgEarlyReflections.value && renderFreqPlot(svgEarlyReflections.value, cea2034, ["Front Wall Bounce", "Side Wall Bounce", "Rear Wall Bounce", "Floor Bounce", "Ceiling Bounce", "Total Early Reflections"])
 
-  svgPir.value && renderFreqPlot(svgPir.value, pir, undefined, {
+  svgPir.value && renderFreqPlot(svgPir.value, pir, ["Estimated In-Room"], {
     min: 100, max: 12000,
   })
 

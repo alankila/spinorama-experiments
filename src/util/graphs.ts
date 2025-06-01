@@ -1,7 +1,7 @@
 import * as d3 from "d3"
 // @ts-ignore no types for this
 import * as d3reg from "d3-regression"
-import { cea2034Di, cea2034NonDi, type SpinoramaData } from "./spinorama"
+import { cea2034Di, cea2034NonDi, type SpinoramaCEA2034, type SpinoramaDualAxisSpin } from "./spinorama"
 
 /* Chart dimensions etc. */
 const aspectRatio = 2
@@ -40,16 +40,13 @@ function prepareGraph(svg: SVGSVGElement, fill?: string) {
   return { graph, width, height }
 }
 
-export function renderFreqPlot(svg: SVGSVGElement, spin: SpinoramaData, datasets?: string[], regression?: { min: number, max: number }) {
-  /* Labels for all datasets + index to that dataset's data in each row */
-  datasets ||= Object.keys(spin.datasets)
-
+export function renderFreqPlot<T extends SpinoramaCEA2034 | SpinoramaDualAxisSpin>(svg: SVGSVGElement, spin: T, datasets: (keyof T["datasets"])[], regression?: { min: number, max: number }) {
   const { graph, width, height } = prepareGraph(svg)
 
   /* x & y scales, color scale for graphs, and coordinates for labels */
   const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight])
   const y = d3.scaleLinear([-45, 5], [height - marginBottom, marginTop])
-  const z = d3.scaleOrdinal(d3.schemeCategory10).domain(datasets)
+  const z = d3.scaleOrdinal(d3.schemeCategory10).domain(datasets as string[]) /* datasets actually is just a string array */
 
   /* line constructor */
   const line = d3.line()
@@ -147,7 +144,7 @@ export function renderFreqPlot(svg: SVGSVGElement, spin: SpinoramaData, datasets
   return graph
 }
 
-export function renderCea2034Plot(svg: SVGSVGElement, spin: SpinoramaData) {
+export function renderCea2034Plot(svg: SVGSVGElement, spin: SpinoramaCEA2034) {
   /* Labels for all datasets + index to that dataset's data in each row */
   const datasets = [...cea2034NonDi, ...cea2034Di]
 
@@ -233,7 +230,7 @@ export function renderCea2034Plot(svg: SVGSVGElement, spin: SpinoramaData) {
   .text(d => d)
 }
 
-export function renderContour(svg: SVGSVGElement, spin: SpinoramaData) {
+export function renderContour(svg: SVGSVGElement, spin: SpinoramaDualAxisSpin) {
   /* Preprocess the dataset. */
   let datasets = [
     "180°", "170°", "160°", "150°", "140°", "130°", "120°", "110°", "100°", "90°", "80°", "70°", "60°", "50°", "40°", "30°", "20°", "10°", "On-Axis",
