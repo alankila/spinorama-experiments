@@ -1,6 +1,7 @@
 import { parse } from "papaparse";
 import { sp_weigths, type Spin } from "./cea2034";
 import _metadata from "@/metadata.json"
+import type { Biquads } from "./iir";
 
 export const metadata = _metadata
 
@@ -141,6 +142,29 @@ export function setToMeanOnAxisLevel(spin: SpinoramaData<Spin>) {
   for (let data of Object.values(spin.datasets)) {
     data.forEach((v, k) => data.set(k, v - mean))
   }
+}
+
+/**
+ * Return IIR filtered version of spinorama measurement, corresponding to equalized version of the measurement
+ * 
+ * @param spin 
+ * @param biquads 
+ * @returns spin with IIR applied
+ */
+export function iirAppliedSpin(spin: SpinoramaData<Spin>, biquads: Biquads) {
+  spin = cloneSpinorama(spin)
+
+  let val = new Map<number, number>()
+  for (let k of spin.freq) {
+    let xfer = biquads.transfer(k)
+    val.set(k, xfer[0])
+  }
+
+  for (let data of Object.values(spin.datasets)) {
+    data.forEach((v, k) => data.set(k, v + (val.get(k) ?? 0)))
+  }
+
+  return spin
 }
 
 /**
