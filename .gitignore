@@ -6,5 +6,6 @@
 # spinorama copies
 /public/eq
 /public/measurements
-/public/metadata.json
 /public/pictures
+/src/metadata.json
+

@@ -1,5 +1,7 @@
 import { parse } from "papaparse";
+import _metadata from "../metadata.json";
 
+export const metadata = _metadata;
 export const cea2034NonDi = ["On Axis", "Listening Window", "Early Reflections", "Sound Power"];
 export const cea2034Di = ["Sound Power DI", "Early Reflections DI"];
 

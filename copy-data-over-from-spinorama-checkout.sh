@@ -23,5 +23,5 @@ for p in "$SPINORAMA/datas/pictures"/*.png; do
 	convert "$p" -scale 300x500 "$SELF/public/pictures/${BASE%.png}.webp"
 done
 
-cp -a "$SPINORAMA/dist/json/metadata.json" "$SELF/public"
+cp -a "$SPINORAMA/dist/json/metadata.json" "$SELF/src"
 
