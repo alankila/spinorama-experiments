@@ -64,7 +64,7 @@ export function setToMeanOnAxisLevel(spin: SpinoramaData) {
   let avg = 0;
   let count = 0;
   for (let data of spin.data) {
-    if (data[idx] > 300 && data[idx] < 3000) {
+    if (data[idx] >= 300 && data[idx] <= 3000) {
       avg += data[idx + 1]
       count ++;
     }
