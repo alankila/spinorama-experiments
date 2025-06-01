@@ -342,7 +342,7 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
     .attr("x2", width - marginLeft - marginRight))
 }
 
-const base = "public/datas/measurements/Genelec 8351B/asr-vertical/";
+const base = "public/measurements/Genelec 8351B/asr-vertical/";
 
 {
   const cea2034 = await readSpinoramaData(base + "CEA2034.txt");

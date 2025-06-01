@@ -16,7 +16,7 @@ export function cloneSpinorama(data: SpinoramaData): SpinoramaData {
 }
 
 export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
-  const graphResult = await fetch(url)
+  const graphResult = await fetch(encodeURI(url))
   const csv = (await graphResult.text()).replace(/\s+$/, "")
 
   let data = parse(csv, { delimiter: "\t" }).data as string[][]
