@@ -18,9 +18,11 @@ rsync -a "$SPINORAMA/datas/eq" "$SELF/public" --include 'iir-autoeq.txt' --exclu
 
 rm -rf "$SELF/public/pictures"
 mkdir "$SELF/public/pictures"
-for p in "$SPINORAMA/datas/pictures"/*.png; do
-	BASE="$(basename "$p")"
-	convert "$p" -scale 300x500 "$SELF/public/pictures/${BASE%.png}.webp"
+for f in png jpg; do
+	for p in "$SPINORAMA/datas/pictures"/*.$f; do
+		BASE="$(basename "$p")"
+		convert "$p" -scale 300x500 "$SELF/public/pictures/${BASE%.$f}.webp"
+	done
 done
 
 cp -a "$SPINORAMA/dist/json/metadata.json" "$SELF/src"

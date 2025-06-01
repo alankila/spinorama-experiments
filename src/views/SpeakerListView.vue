@@ -9,7 +9,7 @@ function tonalityScore(speaker: typeof metadata[keyof typeof metadata]) {
     return undefined
   }
   /* FIXME: this is wrong */
-  return (12.69 - 2.49 * measurement.nbd_on_axis - 2.99 * measurement.nbd_pred_in_room - 4.31 * measurement.lfq + 2.32 * measurement.sm_pred_in_room).toFixed(1)
+  return (12.69 - 2.49 * measurement.nbd_on_axis - 2.99 * measurement.nbd_pred_in_room - 4.31 * Math.log10(measurement.lfx_hz) + 2.32 * measurement.sm_pred_in_room).toFixed(1)
 }
 
 function bassExtension(speaker: typeof metadata[keyof typeof metadata]) {
@@ -20,9 +20,8 @@ function bassExtension(speaker: typeof metadata[keyof typeof metadata]) {
 
 function flatness(speaker: typeof metadata[keyof typeof metadata]) {
   // @ts-ignore
-  const measurement = speaker.measurements[speaker.default_measurement]?.pref_rating
-  /* FIXME: this is wrong */
-  return measurement?.aad_on_axis.toFixed(1)
+  const measurement = speaker.measurements[speaker.default_measurement]?.estimates
+  return measurement?.ref_band?.toFixed(1)
 }
 
 </script>
@@ -31,15 +30,15 @@ function flatness(speaker: typeof metadata[keyof typeof metadata]) {
 
   <div class="speakers">
     <div class="card" v-for="[speakerId, speaker] of Object.entries(metadata)">
-      <div><img :src="`/pictures/${speakerId}.webp`"/></div>
-      <div class="heading">
+      <div><img :src="`/pictures/${encodeURI(speakerId)}.webp`"/></div>
+      <div class="bold">
         {{speaker.brand}} {{speaker.model}}
       </div>
       <div>
-        Price: {{speaker.price}} $<br/>
-        Tonality: {{ tonalityScore(speaker) }}<br/>
-        Bass extension: {{ bassExtension(speaker) }} Hz<br/>
-        Flatness: {{ flatness(speaker) }} dB</br>
+        Price: <span class="bold">{{speaker.price}}</span> $<br/>
+        Tonality: <span class="bold">{{ tonalityScore(speaker) }}</span><br/>
+        Bass extension: <span class="bold">{{ bassExtension(speaker) }}</span> Hz<br/>
+        Flatness: <span class="bold">&pm;{{ flatness(speaker) }}</span> dB</br>
       </div>
       <div class="link"><RouterLink :to="`view/${encodeURI(speakerId)}/${encodeURI(speaker.default_measurement)}`">{{ speaker.default_measurement }}</RouterLink></div>
     </div>
@@ -72,15 +71,15 @@ function flatness(speaker: typeof metadata[keyof typeof metadata]) {
   max-height: 600px;
 }
 
-.card .heading {
-  font-weight: bold;
-}
-
-.link {
+.card .link {
   border-top: 1px solid #ccc;
   padding-top: 0.5em;
   width: 100%;
   text-align: center;
+}
+
+.card .bold {
+  font-weight: bold;
 }
 
 </style>
