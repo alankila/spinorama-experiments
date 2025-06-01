@@ -1,13 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
+import SpeakerView from '../views/SpeakerView.vue'
+import SpeakerListView from '@/views/SpeakerListView.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: HomeView,
+      component: SpeakerListView,
+    },
+    {
+      path: '/view/:speakerId/:measurementId/',
+      component: SpeakerView,
+      props: true,
     },
   ],
 });

@@ -5,6 +5,9 @@ import * as d3 from "d3";
 // @ts-ignore no types for this module
 import * as d3reg from "d3-regression";
 import { cea2034Di, cea2034NonDi, cloneSpinorama, normalizeCea2034, normalizeFrequencyData, preprocessCea2034, preprocessFrequencyData, readSpinoramaData, type SpinoramaData } from "@/util/spinorama";
+import { useRouter } from "vue-router";
+
+const { speakerId, measurementId } = defineProps<{ speakerId: string, measurementId: string }>();
 
 /* Chart dimensions etc. */
 const width = 2000
@@ -276,7 +279,7 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
     for (let name of datasets) {
       let idx = ds.datasets.indexOf(name)
       if (idx == -1) {
-        throw new Error("Unable to find dataset: " + name)
+        throw new Error(`Unable to find dataset: ${name} in ${ds.datasets}`)
       }
       idxs.push(idx + 1)
     }
@@ -342,7 +345,8 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
     .attr("x2", width - marginLeft - marginRight))
 }
 
-const base = "public/measurements/Genelec 8351B/asr-vertical/";
+const router = useRouter();
+const base = router.resolve("/").path + `public/measurements/${speakerId}/${measurementId}/`;
 
 {
   const cea2034 = await readSpinoramaData(base + "CEA2034.txt");

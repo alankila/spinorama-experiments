@@ -17,7 +17,13 @@ export function cloneSpinorama(data: SpinoramaData): SpinoramaData {
 
 export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
   const graphResult = await fetch(encodeURI(url))
+  if (graphResult.status != 200) {
+    throw new Error(`Unable to find data: ${url}: ${graphResult.status} ${graphResult.statusText}`)
+  }
   const csv = (await graphResult.text()).replace(/\s+$/, "")
+  if (!csv.startsWith('"')) {
+    throw new Error(`Bogus result for url: ${url}: ${csv}`)
+  }
 
   let data = parse(csv, { delimiter: "\t" }).data as string[][]
   let title = data.shift() ?? ""
