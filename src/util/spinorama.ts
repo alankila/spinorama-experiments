@@ -1,5 +1,6 @@
 import { parse } from "papaparse";
 import _metadata from "../metadata.json";
+import { sp_weigths } from "./cea2034";
 
 export const metadata = _metadata;
 export const cea2034NonDi = ["On-Axis", "Listening Window", "Total Early Reflections", "Sound Power"];
@@ -10,6 +11,26 @@ export interface SpinoramaData {
   datasets: string[],
   headers: string[],
   data: number[][],
+}
+
+/* Placeholder that shows a flat line */
+export const emptySpinorama: SpinoramaData = {
+  title: "Empty dataset",
+  datasets: [],
+  headers: [],
+  data: [[], []],
+}
+for (let k of Object.keys(sp_weigths)) {
+  emptySpinorama.datasets.push(k)
+  emptySpinorama.datasets.push("")
+
+  emptySpinorama.headers.push("Hz")
+  emptySpinorama.headers.push("dB")
+
+  emptySpinorama.data[0].push(20);
+  emptySpinorama.data[0].push(0);
+  emptySpinorama.data[1].push(20000);
+  emptySpinorama.data[1].push(0);
 }
 
 function cloneSpinorama(data: SpinoramaData): SpinoramaData {

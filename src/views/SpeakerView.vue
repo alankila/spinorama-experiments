@@ -1,46 +1,45 @@
 <script setup lang="ts">
 
 import { onMounted, onUnmounted, useTemplateRef } from "vue";
-import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis } from "@/util/spinorama";
+import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, type SpinoramaData, emptySpinorama } from "@/util/spinorama";
 import { useRouter } from "vue-router";
 import { compute_cea2034, estimated_inroom } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
 
-const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-Axis", "-10°", "-20°", "-30°", "-40°", "-50°", "-60°"];
-
 const { speakerId, measurementId } = defineProps<{ speakerId: string, measurementId: string }>();
+const router = useRouter();
+const base = router.resolve("/").path + `public/measurements/${speakerId}/${measurementId}/`;
 
 const svgCea2034 = useTemplateRef("svgCea2034")
 const svgCea2034Normalized = useTemplateRef("svgCea2034Normalized")
-
 const svgOnAxis = useTemplateRef("svgOnAxis")
-
 const svgEarlyReflections = useTemplateRef("svgEarlyReflections")
-
 const svgPir = useTemplateRef("svgPir")
-
 const svgHorizontalReflections = useTemplateRef("svgHorizontalReflections")
 const svgVerticalReflections = useTemplateRef("svgVerticalReflections")
-
 const svgHorizontal = useTemplateRef("svgHorizontal")
 const svgVertical = useTemplateRef("svgVertical")
 const svgHorizontalNormalized = useTemplateRef("svgHorizontalNormalized")
 const svgVerticalNormalized = useTemplateRef("svgVerticalNormalized")
-
 const svgHorizontalContour = useTemplateRef("svgHorizontalContour")
 const svgVerticalContour = useTemplateRef("svgVerticalContour")
 const svgHorizontalContourNormalized = useTemplateRef("svgHorizontalContourNormalized")
 const svgVerticalContourNormalized = useTemplateRef("svgVerticalContourNormalized")
 
-const router = useRouter();
-const base = router.resolve("/").path + `public/measurements/${speakerId}/${measurementId}/`;
+let horizontalContour: SpinoramaData
+let verticalContour: SpinoramaData
+try {
+  horizontalContour = await readSpinoramaData(base + "SPL Horizontal.txt")
+  setToMeanOnAxisLevel(horizontalContour);
+  verticalContour = await readSpinoramaData(base + "SPL Vertical.txt")
+  setToMeanOnAxisLevel(verticalContour);
+}
+catch (error) {
+  alert(`The file format for ${speakerId}/${measurementId} is not yet supported.`);
+  horizontalContour = verticalContour = emptySpinorama
+}
 
-const horizontalContour = await readSpinoramaData(base + "SPL Horizontal.txt")
-setToMeanOnAxisLevel(horizontalContour);
 const horizontalContourNormalized = normalizedToOnAxis(horizontalContour);
-
-const verticalContour = await readSpinoramaData(base + "SPL Vertical.txt")
-setToMeanOnAxisLevel(verticalContour);
 const verticalContourNormalized = normalizedToOnAxis(verticalContour);
 
 const cea2034 = compute_cea2034(horizontalContour, verticalContour)
@@ -67,6 +66,7 @@ function render() {
   svgHorizontalContour.value && renderContour(svgHorizontalContour.value, horizontalContour)
   svgHorizontalContourNormalized.value && renderContour(svgHorizontalContourNormalized.value, horizontalContourNormalized)
 
+  const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-Axis", "-10°", "-20°", "-30°", "-40°", "-50°", "-60°"];
   svgHorizontal.value && renderFreqPlot(svgHorizontal.value, horizontalContour, directivityAngles)
   svgHorizontalNormalized.value && renderFreqPlot(svgHorizontalNormalized.value, horizontalContourNormalized, directivityAngles)
 

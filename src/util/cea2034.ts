@@ -55,7 +55,7 @@ function compute_weigths() {
 
 const std_weigths = compute_weigths()
 
-const sp_weigths: { [key: string]: number } = {
+export const sp_weigths: { [key: string]: number } = {
     "On-Axis": std_weigths[0],
     "180°": std_weigths[0],
     "-180°": std_weigths[0],

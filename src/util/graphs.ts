@@ -33,6 +33,7 @@ function prepareGraph(svg: SVGSVGElement, fill?: string) {
   .attr("y", marginTop)
   .attr("width", width - marginLeft - marginRight)
   .attr("height", height - marginTop - marginBottom)
+  .attr("stroke-width", 1)
   .attr("stroke", "black")
   .attr("fill", fill ?? "none")
 
