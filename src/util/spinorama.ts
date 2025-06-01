@@ -1,41 +1,41 @@
 import { parse } from "papaparse";
-import _metadata from "../metadata.json";
 import { sp_weigths } from "./cea2034";
 
-export const metadata = _metadata;
+export const metadata = (await import("../metadata.json")).default;
+
 export const cea2034NonDi = ["On-Axis", "Listening Window", "Total Early Reflections", "Sound Power"];
 export const cea2034Di = ["Sound Power DI", "Early Reflections DI"];
 
+export type Cea2034Names = "On-Axis" | "Listening Window" | "Total Early Reflections" | "Sound Power" | "Sound Power DI" | "Early Reflections DI";
+
+export type SpinDataset = keyof typeof sp_weigths
+export const spinDataset = Object.keys(sp_weigths)
+
 export interface SpinoramaData {
-  title: string,
-  datasets: string[],
-  headers: string[],
-  data: number[][],
+  freq: number[],
+  datasets: {
+    [dataset: string]: Map<number, number>,
+  },
 }
 
 /* Placeholder that shows a flat line */
 export const emptySpinorama: SpinoramaData = {
-  title: "Empty dataset",
-  datasets: [],
-  headers: [],
-  data: [[], []],
+  freq: [20, 20000],
+  datasets: {},
 }
 for (let k of Object.keys(sp_weigths)) {
-  emptySpinorama.datasets.push(k)
-  emptySpinorama.datasets.push("")
-
-  emptySpinorama.headers.push("Hz")
-  emptySpinorama.headers.push("dB")
-
-  emptySpinorama.data[0].push(20);
-  emptySpinorama.data[0].push(0);
-  emptySpinorama.data[1].push(20000);
-  emptySpinorama.data[1].push(0);
+  const map = new Map()
+  for (let f of emptySpinorama.freq) {
+    map.set(f, 0)
+  }
+  emptySpinorama.datasets[k] = map
 }
 
-function cloneSpinorama(data: SpinoramaData): SpinoramaData {
-  /* Lame, fix this */
-  return JSON.parse(JSON.stringify(data));
+function cloneSpinorama(data: SpinoramaData) {
+  return {
+    freq: [...data.freq],
+    datasets: Object.fromEntries(Object.entries(data.datasets).map(p => [p[0], new Map([...p[1].entries()])]))
+  }
 }
 
 export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
@@ -52,6 +52,7 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
   let title = data.shift() ?? ""
   let datasets = data.shift() ?? []
   let headers = data.shift() ?? []
+  console.log("Processing dataset", title, "with shape", headers)
 
   /* Spinorama's data format explanation. File is tab-separated CSV collection of data points.
    * Usually, multiple datasets are stored in each file. Format has 3 header rows, followed by the data rows.
@@ -66,47 +67,89 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
    * Data rows are formatted in U.S. numeric format with thousands separator,
    * e.g. 1,234.56.
    */
-  return {
-    title: title[0],
-    datasets,
-    headers,
-    data: data.map(da => da.map(n => parseFloat(n.replace(",", "")))),
+  const output: SpinoramaData = {
+    freq: [],
+    datasets: {},
   }
+
+  for (let d of datasets) {
+    if (d) {
+      if (spinDataset.indexOf(d) === -1) {
+        throw new Error(`Unsupported dataset in ${url}: ${d}`)
+      }
+      output.datasets[d] = new Map()
+    }
+  }
+
+  /* Validate that all frequencies are used consistently and create the datasets with uniform indexing */
+  let count = 0;
+  for (let row of data) {
+    let freq = parseFloat(row[0].replace(",", ""))
+    output.freq.push(freq)
+    for (let i = 0; i < row.length; i += 2) {
+      if (freq !== parseFloat(row[i].replace(",", ""))) {
+        throw new Error(`Inconsistent frequency data: ${freq} vs ${row[i]}`)
+      }
+      output.datasets[datasets[i]].set(freq, parseFloat(row[i + 1].replace(",", "")))
+    }
+
+    count ++;
+  }
+
+  /* Ensure that all datasets are equally long, so no rows were truncated */
+  for (let ds of Object.keys(output.datasets)) {
+    const cmpCount = output.datasets[ds].size
+    if (cmpCount !== count) {
+      throw new Error(`Dataset length is not correct, expected ${count} but had ${cmpCount} in ${ds}`)
+    }
+  }
+
+  /* Ensure frequencies appear in ascending order */
+  output.freq.sort((a, b) => a - b)
+
+  return output
 }
 
 /**
- * Normalize frequency response to 0 level mean
+ * Normalize magnitudes so that On-Axis is 0 and all other measurements are also shifted relative to it.
  *
  * @param spin 
  */
 export function setToMeanOnAxisLevel(spin: SpinoramaData) {
-  let idx = spin.datasets.indexOf("On-Axis")
+  let ds = spin.datasets["On-Axis"]
 
   let avg = 0;
   let count = 0;
-  for (let data of spin.data) {
-    if (data[idx] >= 300 && data[idx] <= 3000) {
-      avg += data[idx + 1]
+  for (let data of ds.entries()) {
+    if (data[0] >= 300 && data[0] <= 3000) {
+      avg += data[1]
       count ++;
     }
   }
 
   let mean = avg / count;
-  for (let data of spin.data) {
-    for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= mean
-    }
+  for (let data of Object.values(spin.datasets)) {
+    data.forEach((v, k) => data.set(k, v - mean))
   }
 }
 
+/**
+ * Subtracted the series from On-Axis suite from all other measurements, then set On-Axis itself to 0
+ * 
+ * @param spin 
+ * @returns new spin with relative levels to On-Axis measurement
+ */
 export function normalizedToOnAxis(spin: SpinoramaData) {
   spin = cloneSpinorama(spin)
-  const idx = spin.datasets.indexOf("On-Axis")
-  for (let data of spin.data) {
-    const value = data[idx + 1]
-    for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= value
+
+  let onAxis = spin.datasets["On-Axis"]
+  for (let data of Object.values(spin.datasets)) {
+    if (data === onAxis) {
+      continue
     }
+    data.forEach((v, k) => data.set(k, v - (onAxis.get(k) ?? 0)))
   }
+
+  onAxis.forEach((v, k) => onAxis.set(k, 0))
   return spin
 }

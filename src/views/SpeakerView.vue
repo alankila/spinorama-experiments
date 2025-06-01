@@ -33,6 +33,10 @@ try {
   setToMeanOnAxisLevel(horizontalContour);
   verticalContour = await readSpinoramaData(base + "SPL Vertical.txt")
   setToMeanOnAxisLevel(verticalContour);
+
+  if ("" + horizontalContour.freq != "" + verticalContour.freq) {
+    throw new Error("Frequency data mismatch between SPL Horizontal and Vertical!");
+  }
 }
 catch (error) {
   alert(`The file format for ${speakerId}/${measurementId} is not yet supported.`);

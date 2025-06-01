@@ -40,13 +40,9 @@ function prepareGraph(svg: SVGSVGElement, fill?: string) {
   return { graph, width, height }
 }
 
-export function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datasets?: string[], regression?: { min: number, max: number }) {
+export function renderFreqPlot(svg: SVGSVGElement, spin: SpinoramaData, datasets?: string[], regression?: { min: number, max: number }) {
   /* Labels for all datasets + index to that dataset's data in each row */
-  datasets ||= dataset.datasets.filter(n => n)
-  const datasetIndexes: { [key: string]: number } = {}
-  for (let ds of datasets) {
-    datasetIndexes[ds] = dataset.datasets.indexOf(ds)
-  }
+  datasets ||= Object.keys(spin.datasets)
 
   const { graph, width, height } = prepareGraph(svg)
 
@@ -61,12 +57,12 @@ export function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datas
   .y(d => y(d[1]))
 
   if (regression) {
-    const ds = datasets[0]
-    const idx = dataset.datasets.indexOf(ds);
+    /* regression is expecting just 1 dataset */
+    const ds = Object.values(spin.datasets)[0]
     const predictor = d3reg.regressionLinear()
-    .x((data: number[]) => Math.log2(data[idx]))
-    .y((data: number[]) => data[idx + 1])
-    (dataset.data.filter(data => data[idx] >= regression.min && data[idx] <= regression.max));
+    .x((d: number[]) => Math.log2(d[0]))
+    .y((d: number[]) => d[1])
+    ([...ds.entries()].filter(data => data[0] >= regression.min && data[0] <= regression.max));
 
     let coords = line([[10, predictor.predict(Math.log2(10))], [40000, predictor.predict(Math.log2(40000))]]);
 
@@ -138,8 +134,7 @@ export function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datas
   .attr("stroke-linecap", "round")
   .attr("stroke", d => z(d))
   .attr("d", d => {
-    const idx = datasetIndexes[d]
-    return line(dataset.data.map(data => [data[idx], data[idx + 1]]))
+    return line(spin.datasets[d])
   })
 
   serie.append("text")
@@ -152,13 +147,9 @@ export function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datas
   return graph
 }
 
-export function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
+export function renderCea2034Plot(svg: SVGSVGElement, spin: SpinoramaData) {
   /* Labels for all datasets + index to that dataset's data in each row */
   const datasets = [...cea2034NonDi, ...cea2034Di]
-  const datasetIndexes: { [key: string]: number } = {}
-  for (let ds of datasets) {
-    datasetIndexes[ds] = dataset.datasets.indexOf(ds)
-  }
 
   const { graph, width, height } = prepareGraph(svg)
 
@@ -214,10 +205,7 @@ export function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
   .attr("stroke-linejoin", "round")
   .attr("stroke-linecap", "round")
   .attr("stroke", z)
-  .attr("d", d => {
-    const idx = datasetIndexes[d];
-    return lineLeft(dataset.data.map(data => [data[idx], data[idx + 1]]))
-  })
+  .attr("d", d => lineLeft(spin.datasets[d]))
 
   let serieRight = graph.append("g")
   .selectAll("g")
@@ -231,10 +219,7 @@ export function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
   .attr("stroke-linejoin", "round")
   .attr("stroke-linecap", "round")
   .attr("stroke", z)
-  .attr("d", d => {
-    const idx = datasetIndexes[d];
-    return lineRight(dataset.data.map(data => [data[idx], data[idx + 1]]))
-  })
+  .attr("d", d => lineRight(spin.datasets[d]))
 
   graph.append("g")
   .selectAll("g")
@@ -248,33 +233,25 @@ export function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
   .text(d => d)
 }
 
-export function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
+export function renderContour(svg: SVGSVGElement, spin: SpinoramaData) {
   /* Preprocess the dataset. */
   let datasets = [
     "180°", "170°", "160°", "150°", "140°", "130°", "120°", "110°", "100°", "90°", "80°", "70°", "60°", "50°", "40°", "30°", "20°", "10°", "On-Axis",
     "-10°", "-20°", "-30°", "-40°", "-50°", "-60°", "-70°", "-80°", "-90°", "-100°", "-110°", "-120°", "-130°", "-140°", "-150°", "-160°", "-170°", "180°"
   ];
 
-  let dataW = ds.data.length;
+  let dataW = spin.freq.length
   let dataH = datasets.length;
   let data = []
-  {
-    let idxs = []
-    for (let name of datasets) {
-      let idx = ds.datasets.indexOf(name)
-      if (idx == -1) {
-        throw new Error(`Unable to find dataset: ${name} in ${ds.datasets}`)
-      }
-      idxs.push(idx + 1)
-    }
-    for (let idx of idxs) {
-      for (let row of ds.data) {
-        data.push(row[idx] < -30 ? -30 : row[idx])
-      }
+  for (let name of datasets) {
+    for (let freq of spin.freq) {
+      let v = spin.datasets[name].get(freq) ?? 0;
+      data.push(Math.max(v, -30))
     }
   }
 
-  const color = d3.scaleSequential(d3.interpolateTurbo).domain([-33, 3]) as any
+  /* 36 colors; 12 ticks is appropriate */
+  const color = d3.scaleSequential(d3.interpolateTurbo).domain([-33, 3])
   const { graph, width, height } = prepareGraph(svg, color(-30))
 
   const contourNaturalHeight = width / dataW * dataH;
@@ -291,10 +268,10 @@ export function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
   .attr("stroke-opacity", 0.3)
   .attr("stroke", "black")
   .selectAll()
-  .data(color.ticks(12))
+  .data(d3.ticks(...color.domain(), 12))
   .join("path")
   .attr("vector-effect", "non-scaling-stroke")
-  .attr("d", (d: any) => path(contours.contour(data, d)))
+  .attr("d", d => path(contours.contour(data, d)))
   .attr("fill", color)
 
   /* x axis ticks */
