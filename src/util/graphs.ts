@@ -1,7 +1,11 @@
 import * as d3 from "d3"
 // @ts-ignore no types for this
 import * as d3reg from "d3-regression"
-import { cea2034Di, cea2034NonDi, type SpinoramaData } from "./spinorama"
+import { type SpinoramaData } from "./spinorama"
+import type { CEA2034, Spin } from "./cea2034"
+
+export const cea2034NonDi = ["On-Axis", "Listening Window", "Total Early Reflections", "Sound Power"] as const
+export const cea2034Di = ["Sound Power DI", "Early Reflections DI"] as const
 
 /* Chart dimensions etc. */
 const aspectRatio = 2
@@ -40,7 +44,7 @@ function prepareGraph(svg: SVGSVGElement, fill?: string) {
   return { graph, width, height }
 }
 
-export function renderFreqPlot(svg: SVGSVGElement, spin: SpinoramaData, datasets: string[], regression?: { min: number, max: number }) {
+export function renderFreqPlot<T extends { [key: string]: Map<number, number> }>(svg: SVGSVGElement, spin: SpinoramaData<T>, datasets: readonly (keyof T & string)[], regression?: { min: number, max: number }) {
   const { graph, width, height } = prepareGraph(svg)
 
   /* x & y scales, color scale for graphs, and coordinates for labels */
@@ -55,11 +59,11 @@ export function renderFreqPlot(svg: SVGSVGElement, spin: SpinoramaData, datasets
 
   if (regression) {
     /* regression is expecting just 1 dataset */
-    const ds = Object.values(spin.datasets)[0]
+    for (let ds of datasets) {
     const predictor = d3reg.regressionLinear()
     .x((d: number[]) => Math.log2(d[0]))
     .y((d: number[]) => d[1])
-    ([...ds.entries()].filter(data => data[0] >= regression.min && data[0] <= regression.max));
+    ([...spin.datasets[ds].entries()].filter(data => data[0] >= regression.min && data[0] <= regression.max));
 
     let coords = line([[10, predictor.predict(Math.log2(10))], [40000, predictor.predict(Math.log2(40000))]]);
 
@@ -96,6 +100,7 @@ export function renderFreqPlot(svg: SVGSVGElement, spin: SpinoramaData, datasets
     .attr("stroke-width", "2")
     .attr("stroke-dasharray", "10,5")
     .attr("d", line([[300, predictor.predict(Math.log2(300)) + 3], [5000, predictor.predict(Math.log2(5000)) + 3]]))
+    }
   }
 
   /* x axis ticks */
@@ -144,7 +149,7 @@ export function renderFreqPlot(svg: SVGSVGElement, spin: SpinoramaData, datasets
   return graph
 }
 
-export function renderCea2034Plot(svg: SVGSVGElement, spin: SpinoramaData) {
+export function renderCea2034Plot(svg: SVGSVGElement, spin: SpinoramaData<CEA2034>) {
   /* Labels for all datasets + index to that dataset's data in each row */
   const datasets = [...cea2034NonDi, ...cea2034Di]
 
@@ -230,12 +235,12 @@ export function renderCea2034Plot(svg: SVGSVGElement, spin: SpinoramaData) {
   .text(d => d)
 }
 
-export function renderContour(svg: SVGSVGElement, spin: SpinoramaData) {
+export function renderContour(svg: SVGSVGElement, spin: SpinoramaData<Spin>) {
   /* Preprocess the dataset. */
   let datasets = [
     "180°", "170°", "160°", "150°", "140°", "130°", "120°", "110°", "100°", "90°", "80°", "70°", "60°", "50°", "40°", "30°", "20°", "10°", "On-Axis",
     "-10°", "-20°", "-30°", "-40°", "-50°", "-60°", "-70°", "-80°", "-90°", "-100°", "-110°", "-120°", "-130°", "-140°", "-150°", "-160°", "-170°", "180°"
-  ];
+  ] as const;
 
   let dataW = spin.freq.length
   let dataH = datasets.length;

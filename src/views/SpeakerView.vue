@@ -3,7 +3,7 @@
 import { onMounted, onUnmounted, useTemplateRef } from "vue";
 import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata, type SpinoramaData } from "@/util/spinorama";
 import { useRouter } from "vue-router";
-import { compute_cea2034, estimated_inroom } from "@/util/cea2034";
+import { compute_cea2034, estimated_inroom, type Spin } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
 
 const { speakerId, measurementId } = defineProps<{ speakerId: keyof typeof metadata, measurementId: string }>();
@@ -26,8 +26,8 @@ const svgVerticalContour = useTemplateRef("svgVerticalContour")
 const svgHorizontalContourNormalized = useTemplateRef("svgHorizontalContourNormalized")
 const svgVerticalContourNormalized = useTemplateRef("svgVerticalContourNormalized")
 
-let horizontalContour: SpinoramaData
-let verticalContour: SpinoramaData
+let horizontalContour: SpinoramaData<Spin>
+let verticalContour: SpinoramaData<Spin>
 try {
   horizontalContour = await readSpinoramaData(base + "SPL Horizontal.txt")
   setToMeanOnAxisLevel(horizontalContour);
@@ -70,7 +70,7 @@ function render() {
   svgHorizontalContour.value && renderContour(svgHorizontalContour.value, horizontalContour)
   svgHorizontalContourNormalized.value && renderContour(svgHorizontalContourNormalized.value, horizontalContourNormalized)
 
-  const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-Axis", "-10°", "-20°", "-30°", "-40°", "-50°", "-60°"];
+  const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-Axis", "-10°", "-20°", "-30°", "-40°", "-50°", "-60°"] as const;
   svgHorizontal.value && renderFreqPlot(svgHorizontal.value, horizontalContour, directivityAngles)
   svgHorizontalNormalized.value && renderFreqPlot(svgHorizontalNormalized.value, horizontalContourNormalized, directivityAngles)
 

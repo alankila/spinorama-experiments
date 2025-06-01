@@ -1,41 +1,38 @@
 import { parse } from "papaparse";
-import { sp_weigths } from "./cea2034";
+import { sp_weigths, type Spin } from "./cea2034";
 import _metadata from "@/metadata.json"
 
 export const metadata = _metadata
 
-export const cea2034NonDi = ["On-Axis", "Listening Window", "Total Early Reflections", "Sound Power"] as const
-export const cea2034Di = ["Sound Power DI", "Early Reflections DI"] as const
-
-export interface SpinoramaData {
+export interface SpinoramaData<T> {
   freq: number[],
-  datasets: {
-    [key: string]: Map<number, number>
-  },
+  datasets: T
 }
 
 /* Placeholder that shows a flat line */
-export const emptySpinorama: SpinoramaData = {
+export const emptySpinorama: SpinoramaData<Spin> = {
   freq: [20, 20000],
-  datasets: {
-  },
+  // @ts-ignore the required Spin types are indeed missing here, but they get filled right below!
+  datasets: {},
 }
 for (let k of Object.keys(sp_weigths)) {
   const map = new Map()
   for (let f of emptySpinorama.freq) {
     map.set(f, 0)
   }
+  // @ts-ignore this is fine, k is from sp_weights
   emptySpinorama.datasets[k] = map
 }
 
-function cloneSpinorama(data: SpinoramaData): SpinoramaData {
+function cloneSpinorama(data: SpinoramaData<Spin>): SpinoramaData<Spin> {
   return {
     freq: [...data.freq],
-    datasets: Object.fromEntries(Object.entries(data.datasets).map(p => [p[0], new Map([...p[1].entries()])]))
+    // @ts-ignore
+    datasets: Object.fromEntries(Object.entries(data.datasets).map(p => [p[0], new Map(p[1].entries())]))
   }
 }
 
-export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
+export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin>> {
   const graphResult = await fetch(encodeURI(url))
   if (graphResult.status != 200) {
     throw new Error(`Unable to find data: ${url}: ${graphResult.status} ${graphResult.statusText}`)
@@ -45,7 +42,7 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
     throw new Error(`Bogus result for url: ${url}: ${csv}`)
   }
 
-  let data = parse(csv, { delimiter: "\t" }).data as string[][]
+  let data = parse<string[]>(csv, { delimiter: "\t" }).data
   let title = data.shift() ?? ""
   let datasets = data.shift() ?? []
   let headers = data.shift() ?? []
@@ -64,21 +61,29 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
    * Data rows are formatted in U.S. numeric format with thousands separator,
    * e.g. 1,234.56.
    */
-  const output: SpinoramaData = {
+  const output: SpinoramaData<Spin> = {
     freq: [],
+    // @ts-ignore filling in datasets below
     datasets: {},
   }
-
   for (let d of datasets) {
     if (d) {
       if (!(d in sp_weigths)) {
         throw new Error(`Unsupported dataset in ${url}: ${d}`)
       }
+      // @ts-ignore OK, this is a valid key; go ahead
       output.datasets[d] = new Map()
     }
   }
 
-  /* Validate that all frequencies are used consistently and create the datasets with uniform indexing */
+  /* Ensure that all datasets are in fact present */
+  for (let ds of Object.keys(sp_weigths)) {
+    if (!(ds in output.datasets)) {
+      throw new Error(`Missing a dataset: ${ds}`)
+    }
+  }  
+
+  /* Validate that all frequencies are used consistently, and create Map containers from the data */
   let count = 0;
   for (let row of data) {
     let freq = parseFloat(row[0].replace(",", ""))
@@ -87,7 +92,9 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
       if (freq !== parseFloat(row[i].replace(",", ""))) {
         throw new Error(`Inconsistent frequency data: ${freq} vs ${row[i]}`)
       }
-      output.datasets[datasets[i]].set(freq, parseFloat(row[i + 1].replace(",", "")))
+      // @ts-ignore
+      let map = output.datasets[datasets[i]];
+      map.set(freq, parseFloat(row[i + 1].replace(",", "")))
     }
 
     count ++;
@@ -95,18 +102,12 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
 
   /* Ensure that all datasets are equally long, so no rows were truncated */
   for (let ds of Object.keys(output.datasets)) {
+    // @ts-ignore
     const cmpCount = output.datasets[ds].size
     if (cmpCount !== count) {
       throw new Error(`Dataset length is not correct, expected ${count} but had ${cmpCount} in ${ds}`)
     }
   }
-
-  /* Ensure that all datasets are in fact present */
-  for (let ds of Object.keys(sp_weigths)) {
-    if (!output.datasets[ds]) {
-      throw new Error(`Missing a dataset: ${ds}`)
-    }
-  }  
 
   /* Ensure frequencies appear in ascending order */
   output.freq.sort((a, b) => a - b)
@@ -119,7 +120,7 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
  *
  * @param spin 
  */
-export function setToMeanOnAxisLevel(spin: SpinoramaData) {
+export function setToMeanOnAxisLevel(spin: SpinoramaData<Spin>) {
   let ds = spin.datasets["On-Axis"]
 
   let avg = 0;
@@ -143,7 +144,7 @@ export function setToMeanOnAxisLevel(spin: SpinoramaData) {
  * @param spin 
  * @returns new spin with relative levels to On-Axis measurement
  */
-export function normalizedToOnAxis(spin: SpinoramaData) {
+export function normalizedToOnAxis(spin: SpinoramaData<Spin>) {
   spin = cloneSpinorama(spin)
 
   let onAxis = spin.datasets["On-Axis"]
