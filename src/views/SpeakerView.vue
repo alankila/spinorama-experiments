@@ -51,14 +51,14 @@ function render() {
   svgCea2034.value && renderCea2034Plot(svgCea2034.value, cea2034)
   svgCea2034Normalized.value && renderCea2034Plot(svgCea2034Normalized.value, cea2034Normalized)
   svgOnAxis.value && renderFreqPlot(svgOnAxis.value, cea2034, ["On-Axis"], {
-    min: 300,
-    max: 5000,
+    min: 100,
+    max: 12000,
   })
 
   svgEarlyReflections.value && renderFreqPlot(svgEarlyReflections.value, cea2034, ["Front Wall Bounce", "Side Wall Bounce", "Rear Wall Bounce", "Floor Bounce", "Ceiling Bounce", "Total Early Reflections"])
 
   svgPir.value && renderFreqPlot(svgPir.value, pir, undefined, {
-    min: 300, max: 5000,
+    min: 100, max: 12000,
   })
 
   svgHorizontalReflections.value && renderFreqPlot(svgHorizontalReflections.value, cea2034, ["Front Wall Bounce", "Side Wall Bounce", "Rear Wall Bounce", "Total Horizontal Reflection"])

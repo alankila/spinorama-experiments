@@ -10,16 +10,44 @@ const marginRight = 40
 const marginBottom = 40
 const marginLeft = 40
 
-export function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datasets?: string[], regression?: { min: number, max: number }) {
+/** Prepare SVG for content */
+function prepareGraph(svg: SVGSVGElement, fill?: string) {
   const width = svg.getBoundingClientRect().width
   const height = width / aspectRatio
 
+  const graph = d3.select(svg)
+  .attr("viewBox", [0, 0, width, height])
+
+  graph.selectAll("*").remove()
+
+  graph.append("clipPath")
+  .attr("id", "cut-graph")
+  .append("rect")
+  .attr("x", marginLeft+1)
+  .attr("y", marginTop+1)
+  .attr("width", width - marginLeft - marginRight - 2)
+  .attr("height", height - marginTop - marginBottom - 2)
+
+  graph.append("rect")
+  .attr("x", marginLeft)
+  .attr("y", marginTop)
+  .attr("width", width - marginLeft - marginRight)
+  .attr("height", height - marginTop - marginBottom)
+  .attr("stroke", "black")
+  .attr("fill", fill ?? "none")
+
+  return { graph, width, height }
+}
+
+export function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datasets?: string[], regression?: { min: number, max: number }) {
   /* Labels for all datasets + index to that dataset's data in each row */
   datasets ||= dataset.datasets.filter(n => n)
   const datasetIndexes: { [key: string]: number } = {}
   for (let ds of datasets) {
     datasetIndexes[ds] = dataset.datasets.indexOf(ds)
   }
+
+  const { graph, width, height } = prepareGraph(svg)
 
   /* x & y scales, color scale for graphs, and coordinates for labels */
   const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight])
@@ -31,51 +59,49 @@ export function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datas
   .x(d => x(d[0]))
   .y(d => y(d[1]))
 
-  const graph = d3.select(svg)
-  .attr("viewBox", [0, 0, width, height])
-  graph.selectAll("*").remove()
-
   if (regression) {
     const ds = datasets[0]
     const idx = dataset.datasets.indexOf(ds);
     const predictor = d3reg.regressionLinear()
-    .x((data: number[]) => Math.log(data[idx]))
+    .x((data: number[]) => Math.log2(data[idx]))
     .y((data: number[]) => data[idx + 1])
     (dataset.data.filter(data => data[idx] >= regression.min && data[idx] <= regression.max));
 
-    let coords = line([[10, predictor.predict(Math.log(10))], [40000, predictor.predict(Math.log(40000))]]);
-    graph.append("clipPath")
-    .attr("id", "cut-graph")
-    .append("rect")
-    .attr("x", marginLeft)
-    .attr("y", marginTop)
-    .attr("width", width - marginLeft - marginRight)
-    .attr("height", height - marginTop - marginBottom)
+    let coords = line([[10, predictor.predict(Math.log2(10))], [40000, predictor.predict(Math.log2(40000))]]);
 
     graph.append("path")
+    .attr("clip-path", "url(#cut-graph)")
     .attr("stroke", "#cec")
     .attr("stroke-width", y(-6) - y(0))
-    .attr("clip-path", "url(#cut-graph)")
     .attr("d", coords);
 
     graph.append("path")
+    .attr("clip-path", "url(#cut-graph)")
     .attr("stroke", "#ada")
     .attr("stroke-width", y(-3) - y(0))
+    .attr("d", coords);
+
+    graph.append("path")
     .attr("clip-path", "url(#cut-graph)")
+    .attr("stroke", "black")
+    .attr("stroke-width", 1)
+    .attr("stroke-dasharray", "3,3")
     .attr("d", coords);
 
     /* FIXME: these lines should be projected perpendicular to the regression normal. They could be slightly off if the line is very steep. */
     graph.append("path")
+    .attr("clip-path", "url(#cut-graph)")
     .attr("stroke", "#484")
     .attr("stroke-width", "2")
-    .attr("stroke-dasharray", "5,5")
-    .attr("d", line([[regression.min, predictor.predict(Math.log(regression.min)) - 3], [regression.max, predictor.predict(Math.log(regression.max)) - 3]]))
+    .attr("stroke-dasharray", "10,5")
+    .attr("d", line([[300, predictor.predict(Math.log2(300)) - 3], [5000, predictor.predict(Math.log2(5000)) - 3]]))
 
     graph.append("path")
+    .attr("clip-path", "url(#cut-graph)")
     .attr("stroke", "#484")
     .attr("stroke-width", "2")
-    .attr("stroke-dasharray", "5,5")
-    .attr("d", line([[regression.min, predictor.predict(Math.log(regression.min)) + 3], [regression.max, predictor.predict(Math.log(regression.max)) + 3]]))
+    .attr("stroke-dasharray", "10,5")
+    .attr("d", line([[300, predictor.predict(Math.log2(300)) + 3], [5000, predictor.predict(Math.log2(5000)) + 3]]))
   }
 
   graph.append("text")
@@ -83,14 +109,6 @@ export function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datas
   .attr("y", marginTop/2)
   .attr("text-anchor", "middle")
   .text(dataset.title)
-
-  graph.append("rect")
-  .attr("x", marginLeft)
-  .attr("y", marginTop)
-  .attr("width", width - marginLeft - marginRight)
-  .attr("height", height - marginTop - marginBottom)
-  .attr("stroke", "black")
-  .attr("fill", "none")
 
   /* x axis ticks */
   graph.append("g")
@@ -114,6 +132,7 @@ export function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datas
   .join("g")
 
   serie.append("path")
+  .attr("clip-path", "url(#cut-graph)")
   .attr("fill", "none")
   .attr("stroke-width", 1.5)
   .attr("stroke-linejoin", "round")
@@ -135,15 +154,14 @@ export function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datas
 }
 
 export function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
-  const width = svg.clientWidth
-  const height = width / aspectRatio
-
   /* Labels for all datasets + index to that dataset's data in each row */
   const datasets = [...cea2034NonDi, ...cea2034Di]
   const datasetIndexes: { [key: string]: number } = {}
   for (let ds of datasets) {
     datasetIndexes[ds] = dataset.datasets.indexOf(ds)
   }
+
+  const { graph, width, height } = prepareGraph(svg)
 
   /* x & y scales, color scale for graphs, and coordinates for labels */
   const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight])
@@ -159,23 +177,11 @@ export function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
   .x(d => x(d[0]))
   .y(d => yRight(d[1]))
 
-  const graph = d3.select(svg)
-  .attr("viewBox", [0, 0, width, height])
-  graph.selectAll("*").remove()
-
   graph.append("text")
   .attr("x", width / 2)
   .attr("y", marginTop / 2)
   .attr("text-anchor", "middle")
   .text(dataset.title)
-
-  graph.append("rect")
-  .attr("x", marginLeft)
-  .attr("y", marginTop)
-  .attr("width", width - marginLeft - marginRight)
-  .attr("height", height - marginTop - marginBottom)
-  .attr("stroke", "black")
-  .attr("fill", "none")
 
   /* x axis ticks */
   graph.append("g")
@@ -203,6 +209,7 @@ export function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
   .join("g")
 
   serieLeft.append("path")
+  .attr("clip-path", "url(#cut-graph)")
   .attr("fill", "none")
   .attr("stroke-width", 1.5)
   .attr("stroke-linejoin", "round")
@@ -219,6 +226,7 @@ export function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
   .join("g")
 
   serieRight.append("path")
+  .attr("clip-path", "url(#cut-graph)")
   .attr("fill", "none")
   .attr("stroke-width", 1.5)
   .attr("stroke-linejoin", "round")
@@ -242,9 +250,6 @@ export function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
 }
 
 export function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
-  const width = svg.clientWidth
-  const height = width / aspectRatio
-
   /* Preprocess the dataset. */
   let datasets = [
     "180°", "170°", "160°", "150°", "140°", "130°", "120°", "110°", "100°", "90°", "80°", "70°", "60°", "50°", "40°", "30°", "20°", "10°", "On-Axis",
@@ -270,6 +275,9 @@ export function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
     }
   }
 
+  const color = d3.scaleSequential(d3.interpolateTurbo).domain([-33, 3]) as any
+  const { graph, width, height } = prepareGraph(svg, color(-30))
+
   const contourNaturalHeight = width / dataW * dataH;
 
   /* x & y scales */
@@ -278,25 +286,12 @@ export function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
 
   const path = d3.geoPath().projection(d3.geoIdentity().scale(width / dataW))
   const contours = d3.contours().size([dataW, dataH])
-  const color = d3.scaleSequential(d3.interpolateTurbo).domain([-33, 3]) as any
   
-  const graph = d3.select(svg)
-  .attr("viewBox", [0, 0, width, height])
-  graph.selectAll("*").remove()
-
   graph.append("text")
   .attr("x", width / 2)
   .attr("y", marginTop / 2)
   .attr("text-anchor", "middle")
   .text(ds.title)
-
-  graph.append("rect")
-  .attr("x", marginLeft)
-  .attr("y", marginTop)
-  .attr("width", width - marginLeft - marginRight)
-  .attr("height", height - marginTop - marginBottom)
-  .attr("stroke", "black")
-  .attr("fill", color(-30))
 
   graph.append("g")
   .attr("transform", `translate(${marginLeft},${marginTop}) scale(${(width - marginLeft - marginRight) / width}, ${(height - marginTop - marginBottom) / contourNaturalHeight})`)
