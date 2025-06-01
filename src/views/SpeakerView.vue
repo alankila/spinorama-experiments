@@ -1,6 +1,6 @@
 <script setup lang="ts">
 
-import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
+import { computed, ref } from "vue";
 import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata, iirAppliedSpin as iirApplied } from "@/util/spinorama";
 import { useRouter } from "vue-router";
 import { compute_cea2034 as computeCea2034, estimated_inroom as estimateInRoom } from "@/util/cea2034";

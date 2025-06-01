@@ -8,7 +8,6 @@ function tonalityScore(speaker: typeof metadata[keyof typeof metadata]) {
   if (!measurement) {
     return undefined
   }
-  /* FIXME: this is wrong */
   return (12.69 - 2.49 * measurement.nbd_on_axis - 2.99 * measurement.nbd_pred_in_room - 4.31 * Math.log10(measurement.lfx_hz) + 2.32 * measurement.sm_pred_in_room).toFixed(1)
 }
 
