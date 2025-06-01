@@ -50,7 +50,7 @@ export function renderFreqPlot<T extends { [key: string]: Map<number, number> }>
   /* x & y scales, color scale for graphs, and coordinates for labels */
   const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight])
   const y = d3.scaleLinear([-45, 5], [height - marginBottom, marginTop])
-  const z = d3.scaleOrdinal(d3.schemeCategory10).domain(datasets) /* datasets actually is just a string array */
+  const z = d3.scaleOrdinal(d3.schemeCategory10).domain(datasets)
 
   /* line constructor */
   const line = d3.line()

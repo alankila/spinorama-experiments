@@ -26,11 +26,12 @@ const svgVerticalContour = useTemplateRef("svgVerticalContour")
 const svgHorizontalContourNormalized = useTemplateRef("svgHorizontalContourNormalized")
 const svgVerticalContourNormalized = useTemplateRef("svgVerticalContourNormalized")
 
-let horizontalContour: SpinoramaData<Spin>
-let verticalContour: SpinoramaData<Spin>
+let horizontalContour = emptySpinorama;
+let verticalContour = emptySpinorama;
 try {
   horizontalContour = await readSpinoramaData(base + "SPL Horizontal.txt")
   setToMeanOnAxisLevel(horizontalContour);
+
   verticalContour = await readSpinoramaData(base + "SPL Vertical.txt")
   setToMeanOnAxisLevel(verticalContour);
 
@@ -40,7 +41,6 @@ try {
 }
 catch (error) {
   alert(`The file format for ${speakerId}/${measurementId} is not yet supported: ` + error);
-  horizontalContour = verticalContour = emptySpinorama
 }
 
 const horizontalContourNormalized = normalizedToOnAxis(horizontalContour);
@@ -50,6 +50,9 @@ const cea2034 = compute_cea2034(horizontalContour, verticalContour)
 const cea2034Normalized = compute_cea2034(horizontalContourNormalized, verticalContourNormalized);
 const pir = estimated_inroom(cea2034)
 
+/**
+ * Refresh SVGs
+ */
 function render() {
   svgCea2034.value && renderCea2034Plot(svgCea2034.value, cea2034)
   svgCea2034Normalized.value && renderCea2034Plot(svgCea2034Normalized.value, cea2034Normalized)

@@ -9,26 +9,30 @@ export interface SpinoramaData<T> {
   datasets: T
 }
 
+export const spinKeys = [
+    "On-Axis", "180°",  "10°", "170°", "-170°", "-10°",  "20°", "160°", "-160°", "-20°",  "30°", "150°", "-150°", "-30°",  "40°", "140°", "-140°", "-40°",  "50°", "130°", "-130°", "-50°",  "60°", "120°", "-120°", "-60°",  "70°", "110°", "-110°", "-70°",  "80°", "100°", "-100°", "-80°",  "90°", "-90°"
+] as const;
+
 /* Placeholder that shows a flat line */
 export const emptySpinorama: SpinoramaData<Spin> = {
   freq: [20, 20000],
   // @ts-ignore the required Spin types are indeed missing here, but they get filled right below!
   datasets: {},
 }
-for (let k of Object.keys(sp_weigths)) {
+for (let k of spinKeys) {
   const map = new Map()
   for (let f of emptySpinorama.freq) {
     map.set(f, 0)
   }
-  // @ts-ignore this is fine, k is from sp_weights
   emptySpinorama.datasets[k] = map
 }
 
 function cloneSpinorama(data: SpinoramaData<Spin>): SpinoramaData<Spin> {
+  const datasets = { ...data.datasets }
+  spinKeys.forEach(k => datasets[k] = new Map(datasets[k]))
   return {
     freq: [...data.freq],
-    // @ts-ignore
-    datasets: Object.fromEntries(Object.entries(data.datasets).map(p => [p[0], new Map(p[1].entries())]))
+    datasets,
   }
 }
 
@@ -66,22 +70,19 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
     // @ts-ignore filling in datasets below
     datasets: {},
   }
-  for (let d of datasets) {
-    if (d) {
-      if (!(d in sp_weigths)) {
-        throw new Error(`Unsupported dataset in ${url}: ${d}`)
-      }
-      // @ts-ignore OK, this is a valid key; go ahead
-      output.datasets[d] = new Map()
+  for (let i = 0; i < datasets.length; i += 2) {
+    if (datasets[i+1]) {
+      throw new Error(`Unexpected dataset name at index ${i+1}`);
     }
-  }
 
-  /* Ensure that all datasets are in fact present */
-  for (let ds of Object.keys(sp_weigths)) {
-    if (!(ds in output.datasets)) {
-      throw new Error(`Missing a dataset: ${ds}`)
+    /* Note: this assertion is hypothetical; we validate it now. */
+    let d = datasets[i] as keyof Spin;
+    if (spinKeys.indexOf(d) === -1) {
+      throw new Error(`Unsupported dataset in ${url}: ${d}`)
     }
-  }  
+
+    output.datasets[d] = new Map()
+  }
 
   /* Validate that all frequencies are used consistently, and create Map containers from the data */
   let count = 0;
@@ -92,7 +93,8 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
       if (freq !== parseFloat(row[i].replace(",", ""))) {
         throw new Error(`Inconsistent frequency data: ${freq} vs ${row[i]}`)
       }
-      // @ts-ignore
+
+      // @ts-ignore this has been proven to be valid before
       let map = output.datasets[datasets[i]];
       map.set(freq, parseFloat(row[i + 1].replace(",", "")))
     }
@@ -100,9 +102,12 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
     count ++;
   }
 
-  /* Ensure that all datasets are equally long, so no rows were truncated */
-  for (let ds of Object.keys(output.datasets)) {
-    // @ts-ignore
+  /* Ensure that all datasets are in fact present */
+  for (let ds of spinKeys) {
+    if (!(ds in output.datasets)) {
+      throw new Error(`Missing a dataset: ${ds}`)
+    }
+
     const cmpCount = output.datasets[ds].size
     if (cmpCount !== count) {
       throw new Error(`Dataset length is not correct, expected ${count} but had ${cmpCount} in ${ds}`)
@@ -139,7 +144,7 @@ export function setToMeanOnAxisLevel(spin: SpinoramaData<Spin>) {
 }
 
 /**
- * Subtracted the series from On-Axis suite from all other measurements, then set On-Axis itself to 0
+ * Subtracts the series from On-Axis suite from all other measurements, then set On-Axis itself to 0
  * 
  * @param spin 
  * @returns new spin with relative levels to On-Axis measurement
@@ -155,6 +160,6 @@ export function normalizedToOnAxis(spin: SpinoramaData<Spin>) {
     data.forEach((v, k) => data.set(k, v - (onAxis.get(k) ?? 0)))
   }
 
-  onAxis.forEach((v, k) => onAxis.set(k, 0))
+  onAxis.forEach((_, k) => onAxis.set(k, 0))
   return spin
 }
