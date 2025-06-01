@@ -12,9 +12,9 @@ export interface SpinoramaData {
   data: number[][],
 }
 
-/* Lame, fix this */
-export function cloneSpinorama(data: SpinoramaData): SpinoramaData {
-    return JSON.parse(JSON.stringify(data));
+function cloneSpinorama(data: SpinoramaData): SpinoramaData {
+  /* Lame, fix this */
+  return JSON.parse(JSON.stringify(data));
 }
 
 export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
@@ -53,37 +53,39 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
   }
 }
 
-/** Produce normalized CEA2034 normalized to "on axis" */
-export async function normalizeCea2034(cea2034Normalized: SpinoramaData) {
-  let nonDiIndex = cea2034NonDi.map(d => cea2034Normalized.datasets.indexOf(d))
-  for (let data of cea2034Normalized.data) {
-    const norm = data[nonDiIndex[0] + 1];
-    for (let i of nonDiIndex) {
-      data[i + 1] -= norm;
-    }
-  }
-}
-
-
 /**
- * Subtract fixed 86 dB offset from every data point
+ * Normalize frequency response to 0 level mean
  *
- * @param freq 
+ * @param spin 
  */
-export function preprocessFrequencyData(freq: SpinoramaData) {
-  for (let data of freq.data) {
+export function setToMeanOnAxisLevel(spin: SpinoramaData) {
+  let idx = spin.datasets.indexOf("On-Axis")
+
+  let avg = 0;
+  let count = 0;
+  for (let data of spin.data) {
+    if (data[idx] > 300 && data[idx] < 3000) {
+      avg += data[idx + 1]
+      count ++;
+    }
+  }
+
+  let mean = avg / count;
+  for (let data of spin.data) {
     for (let i = 0; i < data.length; i += 2) {
-      data[i + 1] -= 86
+      data[i + 1] -= mean
     }
   }
 }
 
-export function normalizeFrequencyData(freq: SpinoramaData, dataset: string) {
-  const idx = freq.datasets.indexOf(dataset)
-  for (let data of freq.data) {
+export function normalizedToOnAxis(spin: SpinoramaData) {
+  spin = cloneSpinorama(spin)
+  const idx = spin.datasets.indexOf("On-Axis")
+  for (let data of spin.data) {
     const value = data[idx + 1]
     for (let i = 0; i < data.length; i += 2) {
       data[i + 1] -= value
     }
   }
+  return spin
 }

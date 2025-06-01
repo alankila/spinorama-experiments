@@ -4,7 +4,7 @@ import { onMounted, useTemplateRef } from "vue";
 import * as d3 from "d3";
 // @ts-ignore no types for this module
 import * as d3reg from "d3-regression";
-import { cea2034Di, cea2034NonDi, cloneSpinorama, normalizeCea2034, normalizeFrequencyData, preprocessFrequencyData, readSpinoramaData, type SpinoramaData } from "@/util/spinorama";
+import { cea2034Di, cea2034NonDi, setToMeanOnAxisLevel, readSpinoramaData, type SpinoramaData, normalizedToOnAxis } from "@/util/spinorama";
 import { useRouter } from "vue-router";
 import { compute_cea2034, estimated_inroom } from "@/util/cea2034";
 
@@ -350,22 +350,16 @@ const router = useRouter();
 const base = router.resolve("/").path + `public/measurements/${speakerId}/${measurementId}/`;
 
 const horizontalContour = await readSpinoramaData(base + "SPL Horizontal.txt")
-preprocessFrequencyData(horizontalContour);
+setToMeanOnAxisLevel(horizontalContour);
+const horizontalContourNormalized = normalizedToOnAxis(horizontalContour);
+
 const verticalContour = await readSpinoramaData(base + "SPL Vertical.txt")
-preprocessFrequencyData(verticalContour);
+setToMeanOnAxisLevel(verticalContour);
+const verticalContourNormalized = normalizedToOnAxis(verticalContour);
 
 const cea2034 = compute_cea2034(horizontalContour, verticalContour)
-console.log(cea2034);
-const cea2034Normalized = cloneSpinorama(cea2034);
-normalizeCea2034(cea2034Normalized);
-
+const cea2034Normalized = compute_cea2034(horizontalContourNormalized, verticalContourNormalized);
 const pir = estimated_inroom(cea2034)
-
-const horizontalContourNormalized = cloneSpinorama(horizontalContour);
-normalizeFrequencyData(horizontalContourNormalized, "On-Axis");
-
-const verticalContourNormalized = cloneSpinorama(verticalContour);
-normalizeFrequencyData(verticalContourNormalized, "On-Axis");
 
 onMounted(() => {
   svgCea2034.value && renderCea2034Plot(svgCea2034.value, cea2034)
