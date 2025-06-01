@@ -1,32 +1,17 @@
 <script setup lang="ts">
 
-import { onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from "vue";
 import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata, iirAppliedSpin } from "@/util/spinorama";
 import { useRouter } from "vue-router";
-import { compute_cea2034, estimated_inroom } from "@/util/cea2034";
+import { compute_cea2034 as computeCea2034, estimated_inroom as estimateInRoom } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
 import { Biquads } from "@/util/iir";
+import Graph from "@/components/Graph.vue";
 
 const { speakerId, measurementId } = defineProps<{ speakerId: keyof typeof metadata, measurementId: string }>();
 const router = useRouter();
 
 const applyIir = ref(false);
-
-const svgCea2034 = useTemplateRef("svgCea2034")
-const svgCea2034Normalized = useTemplateRef("svgCea2034Normalized")
-const svgOnAxis = useTemplateRef("svgOnAxis")
-const svgEarlyReflections = useTemplateRef("svgEarlyReflections")
-const svgPir = useTemplateRef("svgPir")
-const svgHorizontalReflections = useTemplateRef("svgHorizontalReflections")
-const svgVerticalReflections = useTemplateRef("svgVerticalReflections")
-const svgHorizontal = useTemplateRef("svgHorizontal")
-const svgVertical = useTemplateRef("svgVertical")
-const svgHorizontalNormalized = useTemplateRef("svgHorizontalNormalized")
-const svgVerticalNormalized = useTemplateRef("svgVerticalNormalized")
-const svgHorizontalContour = useTemplateRef("svgHorizontalContour")
-const svgVerticalContour = useTemplateRef("svgVerticalContour")
-const svgHorizontalContourNormalized = useTemplateRef("svgHorizontalContourNormalized")
-const svgVerticalContourNormalized = useTemplateRef("svgVerticalContourNormalized")
 
 let horizontalContourOriginal = emptySpinorama;
 let verticalContourOriginal = emptySpinorama;
@@ -53,64 +38,18 @@ catch (error) {
   alert(`The file format for ${speakerId}/${measurementId} is not yet supported: ` + error);
 }
 
-/**
- * Refresh SVGs
- */
-function render() {
-  let horizontalContour = horizontalContourOriginal
-  let verticalContour = verticalContourOriginal
-  if (applyIir.value && biquads) {
-    horizontalContour = iirAppliedSpin(horizontalContourOriginal, biquads)
-    verticalContour = iirAppliedSpin(verticalContourOriginal, biquads)
-  }
+/* Not affected by eq, so cached as-is */
+const horizontalContourNormalized = normalizedToOnAxis(horizontalContourOriginal);
+const verticalContourNormalized = normalizedToOnAxis(verticalContourOriginal);
+const cea2034Normalized = computeCea2034(horizontalContourNormalized, verticalContourNormalized)
 
-  const horizontalContourNormalized = normalizedToOnAxis(horizontalContour);
-  const verticalContourNormalized = normalizedToOnAxis(verticalContour);
+/* Dynamic bits affected by eq */
+const horizontalContour = computed(() => biquads && applyIir.value ? iirAppliedSpin(horizontalContourOriginal, biquads) : horizontalContourOriginal)
+const verticalContour = computed(() => biquads && applyIir.value ? iirAppliedSpin(verticalContourOriginal, biquads) : verticalContourOriginal)
+const cea2034 = computed(() => computeCea2034(horizontalContour.value, verticalContour.value))
+const pir = computed(() => estimateInRoom(cea2034.value))
 
-  const cea2034 = compute_cea2034(horizontalContour, verticalContour)
-  const cea2034Normalized = compute_cea2034(horizontalContourNormalized, verticalContourNormalized);
-  const pir = estimated_inroom(cea2034)
-
-  svgCea2034.value && renderCea2034Plot(svgCea2034.value, cea2034)
-  svgCea2034Normalized.value && renderCea2034Plot(svgCea2034Normalized.value, cea2034Normalized)
-  svgOnAxis.value && renderFreqPlot(svgOnAxis.value, cea2034, ["On-Axis"], {
-    min: 100,
-    max: 12000,
-  })
-
-  svgEarlyReflections.value && renderFreqPlot(svgEarlyReflections.value, cea2034, ["Front Wall Bounce", "Side Wall Bounce", "Rear Wall Bounce", "Floor Bounce", "Ceiling Bounce", "Total Early Reflections"])
-
-  svgPir.value && renderFreqPlot(svgPir.value, pir, ["Estimated In-Room"], {
-    min: 100, max: 12000,
-  })
-
-  svgHorizontalReflections.value && renderFreqPlot(svgHorizontalReflections.value, cea2034, ["Front Wall Bounce", "Side Wall Bounce", "Rear Wall Bounce", "Total Horizontal Reflection"])
-  svgVerticalReflections.value && renderFreqPlot(svgVerticalReflections.value, cea2034, ["Floor Bounce", "Ceiling Bounce", "Total Vertical Reflection"])
-
-  svgHorizontalContour.value && renderContour(svgHorizontalContour.value, horizontalContour)
-  svgHorizontalContourNormalized.value && renderContour(svgHorizontalContourNormalized.value, horizontalContourNormalized)
-
-  const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-Axis", "-10°", "-20°", "-30°", "-40°", "-50°", "-60°"] as const;
-  svgHorizontal.value && renderFreqPlot(svgHorizontal.value, horizontalContour, directivityAngles)
-  svgHorizontalNormalized.value && renderFreqPlot(svgHorizontalNormalized.value, horizontalContourNormalized, directivityAngles)
-
-  svgVerticalContour.value && renderContour(svgVerticalContour.value, verticalContour)
-  svgVerticalContourNormalized.value && renderContour(svgVerticalContourNormalized.value, verticalContourNormalized)
-
-  svgVertical.value && renderFreqPlot(svgVertical.value, verticalContour, directivityAngles)
-  svgVerticalNormalized.value && renderFreqPlot(svgVerticalNormalized.value, verticalContourNormalized, directivityAngles)
-}
-
-onMounted(render);
-
-onMounted(() => {
-  window.addEventListener("resize", render)
-})
-onUnmounted(() => {
-  window.removeEventListener("resize", render);
-})
-
-watch(applyIir, render)
+const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-Axis", "-10°", "-20°", "-30°", "-40°", "-50°", "-60°"] as const;
 
 </script>
 
@@ -125,49 +64,49 @@ watch(applyIir, render)
   </div>
 
   <h1>CEA2034</h1>
-  <svg ref="svgCea2034"></svg>
+  <Graph :spin="cea2034" :render="renderCea2034Plot" :datasets="[]"/>
 
   <h1>CEA2034 Normalized</h1>
-  <svg ref="svgCea2034Normalized"></svg>
+  <Graph :spin="cea2034Normalized" :render="renderCea2034Plot" :datasets="[]"/>
 
   <h1>On axis</h1>
-  <svg ref="svgOnAxis"></svg>
+  <Graph :spin="cea2034" :render="renderCea2034Plot" :datasets="['On-Axis']" :regression="{ min: 100, max: 12000 }"/>
 
   <h1>Early reflections</h1>
-  <svg ref="svgEarlyReflections"></svg>
+  <Graph :spin="cea2034" :render="renderFreqPlot" :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Floor Bounce', 'Ceiling Bounce', 'Total Early Reflections']"/>
 
   <h1>Estimated In-Room Response</h1>
-  <svg ref="svgPir"></svg>
+  <Graph :spin="pir" :render="renderFreqPlot" :datasets="['Estimated In-Room']" :regression="{ min: 100, max: 12000 }"/>
 
   <h1>Horizontal reflections</h1>
-  <svg ref="svgHorizontalReflections"></svg>
+  <Graph :spin="cea2034" :render="renderFreqPlot" :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Total Horizontal Reflection']" />
 
   <h1>Vertical reflections</h1>
-  <svg ref="svgVerticalReflections"></svg>
+  <Graph :spin="cea2034" :render="renderFreqPlot" :datasets="['Front Wall Bounce', 'Side Wall Bounce', 'Rear Wall Bounce', 'Total Horizontal Reflection']" />
 
   <h1>Horizontal</h1>
-  <svg ref="svgHorizontal"></svg>
+  <Graph :spin="horizontalContour" :render="renderFreqPlot" :datasets="directivityAngles" />
 
   <h1>Vertical</h1>
-  <svg ref="svgVertical"></svg>
+  <Graph :spin="verticalContour" :render="renderFreqPlot" :datasets="directivityAngles" />
 
   <h1>Horizontal Normalized</h1>
-  <svg ref="svgHorizontalNormalized"></svg>
+  <Graph :spin="horizontalContourNormalized" :render="renderFreqPlot" :datasets="directivityAngles" />
 
   <h1>Vertical Normalized</h1>
-  <svg ref="svgVerticalNormalized"></svg>
+  <Graph :spin="verticalContourNormalized" :render="renderFreqPlot" :datasets="directivityAngles" />
 
   <h1>Horizontal contour</h1>
-  <svg ref="svgHorizontalContour"></svg>
+  <Graph :spin="horizontalContour" :render="renderContour" :datasets="[]" />
 
   <h1>Vertical contour</h1>
-  <svg ref="svgVerticalContour"></svg>
+  <Graph :spin="verticalContour" :render="renderContour" :datasets="[]" />
 
   <h1>Horizontal Contour Normalized</h1>
-  <svg ref="svgHorizontalContourNormalized"></svg>
+  <Graph :spin="horizontalContourNormalized" :render="renderContour" :datasets="[]" />
 
   <h1>Vertical Contour Normalized</h1>
-  <svg ref="svgVerticalContourNormalized"></svg>
+  <Graph :spin="verticalContourNormalized" :render="renderContour" :datasets="[]" />
 </template>
 
 <style scoped>

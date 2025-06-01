@@ -14,6 +14,8 @@ const marginRight = 40
 const marginBottom = 40
 const marginLeft = 40
 
+export type GraphType<T extends { [key: string]: Map<number, number> }> = (svg: SVGSVGElement, spin: SpinoramaData<T>, datasets: readonly (keyof T)[], regression?: { min: number, max: number }) => void;
+
 /** Prepare SVG for content */
 function prepareGraph(svg: SVGSVGElement, fill?: string) {
   const width = svg.getBoundingClientRect().width
