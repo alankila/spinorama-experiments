@@ -4,8 +4,9 @@ import { onMounted, useTemplateRef } from "vue";
 import * as d3 from "d3";
 // @ts-ignore no types for this module
 import * as d3reg from "d3-regression";
-import { cea2034Di, cea2034NonDi, cloneSpinorama, normalizeCea2034, normalizeFrequencyData, preprocessCea2034, preprocessFrequencyData, readSpinoramaData, type SpinoramaData } from "@/util/spinorama";
+import { cea2034Di, cea2034NonDi, cloneSpinorama, normalizeCea2034, normalizeFrequencyData, preprocessFrequencyData, readSpinoramaData, type SpinoramaData } from "@/util/spinorama";
 import { useRouter } from "vue-router";
+import { compute_cea2034, estimated_inroom } from "@/util/cea2034";
 
 const { speakerId, measurementId } = defineProps<{ speakerId: string, measurementId: string }>();
 
@@ -51,7 +52,7 @@ function renderFreqPlot(svg: SVGSVGElement, dataset: SpinoramaData, datasets?: s
 
   /* x & y scales, color scale for graphs, and coordinates for labels */
   const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight])
-  const y = d3.scaleLinear([-45, 5], [height - marginBottom, marginTop])
+  const y = d3.scaleLinear([-45, 10], [height - marginBottom, marginTop])
   const z = d3.scaleOrdinal(d3.schemeCategory10).domain(datasets)
 
   /* line constructor */
@@ -171,8 +172,8 @@ function renderCea2034Plot(svg: SVGSVGElement, dataset: SpinoramaData) {
 
   /* x & y scales, color scale for graphs, and coordinates for labels */
   const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight])
-  const yLeft = d3.scaleLinear([-45, 5], [height - marginBottom, marginTop])
-  const yRight = d3.scaleLinear([-10, 10], [height - marginBottom, height / 2])
+  const yLeft = d3.scaleLinear([-45, 10], [height - marginBottom, marginTop])
+  const yRight = d3.scaleLinear([-15, 15], [yLeft(-45), yLeft(-15)])
   const z = d3.scaleOrdinal(d3.schemeCategory10).domain(datasets)
 
   /* line constructors */
@@ -348,85 +349,53 @@ function renderContour(svg: SVGSVGElement, ds: SpinoramaData) {
 const router = useRouter();
 const base = router.resolve("/").path + `public/measurements/${speakerId}/${measurementId}/`;
 
-{
-  const cea2034 = await readSpinoramaData(base + "CEA2034.txt");
-  preprocessCea2034(cea2034);
-  const cea2034Normalized = cloneSpinorama(cea2034);
-  normalizeCea2034(cea2034Normalized);
+const horizontalContour = await readSpinoramaData(base + "SPL Horizontal.txt")
+preprocessFrequencyData(horizontalContour);
+const verticalContour = await readSpinoramaData(base + "SPL Vertical.txt")
+preprocessFrequencyData(verticalContour);
 
-  onMounted(() => {
-    svgCea2034.value && renderCea2034Plot(svgCea2034.value, cea2034)
-    svgCea2034Normalized.value && renderCea2034Plot(svgCea2034Normalized.value, cea2034Normalized)
-    svgOnAxis.value && renderFreqPlot(svgOnAxis.value, cea2034, ["On Axis"], {
-      min: 300,
-      max: 5000,
-    })
+const cea2034 = compute_cea2034(horizontalContour, verticalContour)
+console.log(cea2034);
+const cea2034Normalized = cloneSpinorama(cea2034);
+normalizeCea2034(cea2034Normalized);
+
+const pir = estimated_inroom(cea2034)
+
+const horizontalContourNormalized = cloneSpinorama(horizontalContour);
+normalizeFrequencyData(horizontalContourNormalized, "On-Axis");
+
+const verticalContourNormalized = cloneSpinorama(verticalContour);
+normalizeFrequencyData(verticalContourNormalized, "On-Axis");
+
+onMounted(() => {
+  svgCea2034.value && renderCea2034Plot(svgCea2034.value, cea2034)
+  svgCea2034Normalized.value && renderCea2034Plot(svgCea2034Normalized.value, cea2034Normalized)
+  svgOnAxis.value && renderFreqPlot(svgOnAxis.value, cea2034, ["On-Axis"], {
+    min: 300,
+    max: 5000,
   })
-}
 
-{
-  const earlyReflections = await readSpinoramaData(base + "Early Reflections.txt")
-  preprocessFrequencyData(earlyReflections);
-  onMounted(() => {
-    svgEarlyReflections.value && renderFreqPlot(svgEarlyReflections.value, earlyReflections)
+  svgEarlyReflections.value && renderFreqPlot(svgEarlyReflections.value, cea2034, ["Front Wall Bounce", "Side Wall Bounce", "Rear Wall Bounce", "Floor Bounce", "Ceiling Bounce", "Total Early Reflections"])
+
+  svgPir.value && renderFreqPlot(svgPir.value, pir, undefined, {
+    min: 300, max: 5000,
   })
-}
 
-{
-  const pir = await readSpinoramaData(base + "Estimated In-Room Response.txt")
-  preprocessFrequencyData(pir);
-  onMounted(() => {
-    svgPir.value && renderFreqPlot(svgPir.value, pir, undefined, {
-      min: 300, max: 5000,
-    })
-  })
-}
+  svgHorizontalReflections.value && renderFreqPlot(svgHorizontalReflections.value, cea2034, ["Front Wall Bounce", "Side Wall Bounce", "Rear Wall Bounce", "Total Horizontal Reflection"])
+  svgVerticalReflections.value && renderFreqPlot(svgVerticalReflections.value, cea2034, ["Floor Bounce", "Ceiling Bounce", "Total Vertical Reflection"])
 
-{
-  const horizontalReflections = await readSpinoramaData(base + "Horizontal Reflections.txt")
-  preprocessFrequencyData(horizontalReflections);
-  onMounted(() => {
-    svgHorizontalReflections.value && renderFreqPlot(svgHorizontalReflections.value, horizontalReflections)
-  })
-}
+  svgHorizontalContour.value && renderContour(svgHorizontalContour.value, horizontalContour)
+  svgHorizontalContourNormalized.value && renderContour(svgHorizontalContourNormalized.value, horizontalContourNormalized)
 
-{
-  const verticalReflections = await readSpinoramaData(base + "Vertical Reflections.txt")
-  preprocessFrequencyData(verticalReflections);
-  onMounted(() => {
-    svgVerticalReflections.value && renderFreqPlot(svgVerticalReflections.value, verticalReflections)
-  })
-}
+  svgHorizontal.value && renderFreqPlot(svgHorizontal.value, horizontalContour, directivityAngles)
+  svgHorizontalNormalized.value && renderFreqPlot(svgHorizontalNormalized.value, horizontalContourNormalized, directivityAngles)
 
-{
-  const horizontalContour = await readSpinoramaData(base + "SPL Horizontal.txt")
-  preprocessFrequencyData(horizontalContour);
-  const horizontalContourNormalized = cloneSpinorama(horizontalContour);
-  normalizeFrequencyData(horizontalContourNormalized, "On-Axis");
+  svgVerticalContour.value && renderContour(svgVerticalContour.value, verticalContour)
+  svgVerticalContourNormalized.value && renderContour(svgVerticalContourNormalized.value, verticalContourNormalized)
 
-  onMounted(() => {
-    svgHorizontalContour.value && renderContour(svgHorizontalContour.value, horizontalContour)
-    svgHorizontalContourNormalized.value && renderContour(svgHorizontalContourNormalized.value, horizontalContourNormalized)
-
-    svgHorizontal.value && renderFreqPlot(svgHorizontal.value, horizontalContour, directivityAngles)
-    svgHorizontalNormalized.value && renderFreqPlot(svgHorizontalNormalized.value, horizontalContourNormalized, directivityAngles)
-  })
-}
-
-{
-  const verticalContour = await readSpinoramaData(base + "SPL Vertical.txt")
-  preprocessFrequencyData(verticalContour);
-  const verticalContourNormalized = cloneSpinorama(verticalContour);
-  normalizeFrequencyData(verticalContourNormalized, "On-Axis");
-
-  onMounted(() => {
-    svgVerticalContour.value && renderContour(svgVerticalContour.value, verticalContour)
-    svgVerticalContourNormalized.value && renderContour(svgVerticalContourNormalized.value, verticalContourNormalized)
-
-    svgVertical.value && renderFreqPlot(svgVertical.value, verticalContour, directivityAngles)
-    svgVerticalNormalized.value && renderFreqPlot(svgVerticalNormalized.value, verticalContourNormalized, directivityAngles)
-  })
-}
+  svgVertical.value && renderFreqPlot(svgVertical.value, verticalContour, directivityAngles)
+  svgVerticalNormalized.value && renderFreqPlot(svgVerticalNormalized.value, verticalContourNormalized, directivityAngles)
+})
 
 </script>
 

@@ -2,7 +2,7 @@ import { parse } from "papaparse";
 import _metadata from "../metadata.json";
 
 export const metadata = _metadata;
-export const cea2034NonDi = ["On Axis", "Listening Window", "Early Reflections", "Sound Power"];
+export const cea2034NonDi = ["On-Axis", "Listening Window", "Total Early Reflections", "Sound Power"];
 export const cea2034Di = ["Sound Power DI", "Early Reflections DI"];
 
 export interface SpinoramaData {
@@ -50,25 +50,6 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData> {
     datasets,
     headers,
     data: data.map(da => da.map(n => parseFloat(n.replace(",", "")))),
-  }
-}
-
-/**
- * Subtract 86 dB offset from freq data and remove DI offset
- * 
- * @param cea2034 
- */
-export function preprocessCea2034(cea2034: SpinoramaData) {
-  let nonDiIndex = cea2034NonDi.map(d => cea2034.datasets.indexOf(d))
-  let diOffset = cea2034.datasets.indexOf("DI offset")
-  let diIndex = cea2034Di.map(d => cea2034.datasets.indexOf(d))
-  for (let data of cea2034.data) {
-    for (let i of nonDiIndex) {
-      data[i + 1] -= 86;
-    }
-    for (let i of diIndex) {
-      data[i + 1] -= data[diOffset + 1];
-    }
   }
 }
 
