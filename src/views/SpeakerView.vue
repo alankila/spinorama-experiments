@@ -1,9 +1,9 @@
 <script setup lang="ts">
 
 import { onMounted, onUnmounted, useTemplateRef } from "vue";
-import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata, type SpinoramaData } from "@/util/spinorama";
+import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata } from "@/util/spinorama";
 import { useRouter } from "vue-router";
-import { compute_cea2034, estimated_inroom, type Spin } from "@/util/cea2034";
+import { compute_cea2034, estimated_inroom } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
 
 const { speakerId, measurementId } = defineProps<{ speakerId: keyof typeof metadata, measurementId: string }>();

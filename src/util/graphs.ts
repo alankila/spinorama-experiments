@@ -256,17 +256,15 @@ export function renderContour(svg: SVGSVGElement, spin: SpinoramaData<Spin>) {
   const color = d3.scaleSequential(d3.interpolateTurbo).domain([-33, 3])
   const { graph, width, height } = prepareGraph(svg, color(-30))
 
-  const contourNaturalHeight = width / dataW * dataH;
-
   /* x & y scales */
   const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight])
   const y = d3.scaleLinear([-180, 180], [height - marginBottom, marginTop])
 
-  const path = d3.geoPath().projection(d3.geoIdentity().scale(width / dataW))
+  const path = d3.geoPath()
   const contours = d3.contours().size([dataW, dataH])
   
   graph.append("g")
-  .attr("transform", `translate(${marginLeft},${marginTop}) scale(${(width - marginLeft - marginRight) / width}, ${(height - marginTop - marginBottom) / contourNaturalHeight})`)
+  .attr("transform", `translate(${marginLeft},${marginTop}) scale(${(width - marginLeft - marginRight) / dataW}, ${(height - marginTop - marginBottom) / dataH})`)
   .attr("stroke-opacity", 0.3)
   .attr("stroke", "black")
   .selectAll()
