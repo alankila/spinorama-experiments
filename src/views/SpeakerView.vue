@@ -8,7 +8,7 @@ import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs"
 
 const { speakerId, measurementId } = defineProps<{ speakerId: string, measurementId: string }>();
 const router = useRouter();
-const base = router.resolve("/").path + `public/measurements/${speakerId}/${measurementId}/`;
+const base = router.resolve("/").href + `measurements/${speakerId}/${measurementId}/`;
 
 const svgCea2034 = useTemplateRef("svgCea2034")
 const svgCea2034Normalized = useTemplateRef("svgCea2034Normalized")
