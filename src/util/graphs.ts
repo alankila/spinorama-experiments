@@ -113,7 +113,7 @@ export function renderFreqPlot<T extends { [key: string]: Map<number, number> }>
   /* x axis ticks */
   graph.append("g")
   .attr("transform", `translate(0, ${height - marginBottom})`)
-  .call(d3.axisBottom(x).ticks(width / 60))
+  .call(d3.axisBottom(x).ticks(width / 80))
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
     .attr("y2", -height + marginTop + marginBottom))
@@ -179,7 +179,7 @@ export function renderCea2034Plot(svg: SVGSVGElement, spin: SpinoramaData<CEA203
   /* x axis ticks */
   graph.append("g")
   .attr("transform", `translate(0, ${height - marginBottom})`)
-  .call(d3.axisBottom(x).ticks(width / 60))
+  .call(d3.axisBottom(x).ticks(width / 80))
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
     .attr("y2", -height + marginTop + marginBottom))
@@ -284,7 +284,7 @@ export function renderContour(svg: SVGSVGElement, spin: SpinoramaData<Spin>) {
   /* x axis ticks */
   graph.append("g")
   .attr("transform", `translate(0, ${height - marginBottom})`)
-  .call(d3.axisBottom(x).ticks(width / 60))
+  .call(d3.axisBottom(x).ticks(width / 80))
   .call(g => g.selectAll(".tick line").clone()
     .attr("stroke-opacity", d => d === 1 ? null : 0.2)
     .attr("y2", -height + marginTop + marginBottom))

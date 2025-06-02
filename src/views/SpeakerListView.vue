@@ -39,10 +39,10 @@ function format(speaker: typeof metadata[keyof typeof metadata]) {
         {{speaker.brand}} {{speaker.model}}
       </div>
       <div>
-        Price: <span class="bold">{{speaker.price}}</span> $<br/>
+        Price: <span class="bold">${{speaker.price}}</span><br/>
         Tonality: <span class="bold">{{ tonalityScore(speaker) }}</span><br/>
-        Bass extension: <span class="bold">{{ bassExtension(speaker) }}</span> Hz<br/>
-        Flatness: <span class="bold">&pm;{{ flatness(speaker) }}</span> dB</br>
+        Bass extension: <span class="bold">{{ bassExtension(speaker) }}&#x202f;Hz</span><br/>
+        Flatness: <span class="bold">&pm;{{ flatness(speaker) }}&#x202f;dB</span></br>
       </div>
       <div class="link">
         <RouterLink :to="`view/${encodeURI(speakerId)}/${encodeURI(speaker.default_measurement)}`">
@@ -60,6 +60,9 @@ function format(speaker: typeof metadata[keyof typeof metadata]) {
   display: grid;
   grid-template-columns: repeat(auto-fit, 400px);
   gap: 1em;
+  background-color: #ddd;
+  justify-content: center;
+  padding: 1em;
 }
 
 .card {
@@ -73,6 +76,7 @@ function format(speaker: typeof metadata[keyof typeof metadata]) {
   grid-auto-rows: max-content;
   gap: 0.5em;
   overflow: hidden;
+  background: #fff;
 }
 
 .card img {

@@ -147,16 +147,15 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
 div.measurement {
   display: grid;
   grid-template-areas: "title form" "content content";
-  grid-template-columns: minmax(max-content, 1fr) 1fr;
+  grid-template-columns: max-content 1fr;
   grid-template-rows: max-content 1fr;
   max-height: 100vh;
-  gap: 1em;
 }
 
 h1 {
   grid-area: title;
-  text-align: center;
-  padding: 0.5em;
+  padding: 0.5em 1em;
+  margin: 0;
 }
 
 h1.title {
@@ -167,7 +166,7 @@ h1.title {
 .form {
   grid-area: form;
   display: grid;
-  gap: 0.25em;
+  gap: 0.5em;
   align-self: center;
 }
 
@@ -179,13 +178,17 @@ h1.title {
   gap: 1em;
   overflow-y: scroll;
   padding: 1em;
+  justify-content: center;
+  background-color: #ddd;
 }
 
 .card {
+  background-color: white;
   border: 1px solid black;
   border-radius: 1em;
   box-shadow: 0px 0.5em 1em rgba(0, 0, 0, 0.3);
   height: content;
+  padding: 0.5em;
 }
 
 .card svg {
