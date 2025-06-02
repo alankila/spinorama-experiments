@@ -73,12 +73,12 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
     <div class="form">
       <label>
         <input type="checkbox" v-model="applyIir">
-        Apply recommended auto-iir equalizer to the measurement
+        Apply autoeq parametric equalizer to the measurements
       </label>
 
       <label>
         <input type="checkbox" v-model="showNormalized">
-        Normalize measurements to On-Axis response level
+        Normalize measurements to produce flat On-Axis response level
       </label>
     </div>
 
