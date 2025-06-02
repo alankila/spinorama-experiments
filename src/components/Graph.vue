@@ -1,16 +1,17 @@
 <script setup lang="ts" generic="T extends { [key: string]: Map<number, number> }">
 
-import type { GraphType } from '@/util/graphs';
+import type { Domain, GraphType } from '@/util/graphs';
 import type { SpinoramaData } from '@/util/spinorama';
 import { onMounted, onUnmounted, ref, useTemplateRef, watchEffect } from 'vue';
 
 const svg = useTemplateRef("svg")
 
-const { render, spin, datasets, regression } = defineProps<{
+const { render, spin, datasets, regression, domain } = defineProps<{
   render: GraphType<T>,
   spin: SpinoramaData<T>,
   datasets: readonly (keyof T & string)[],
-  regression?: { min: number, max: number },
+  regression?: Domain,
+  domain?: Domain,
 }>()
 
 const refreshCounter = ref(1);
@@ -21,7 +22,7 @@ let renderedWidth = -1;
  */
 watchEffect(() => {
   if (svg.value && refreshCounter.value) {
-    render(svg.value, spin, datasets, regression)
+    render(svg.value, spin, datasets, regression, domain)
     renderedWidth = refreshCounter.value
   }
 });

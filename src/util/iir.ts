@@ -15,10 +15,6 @@ class Biquad {
         this.b2 = b2/a0
     }
 
-    private setPreamp(gain: number) {
-        this.set(1, 0, 0, 10 ** (gain / 20), 0, 0)
-    }
-
     private setLP(center_frequency: number, sampling_frequency: number, quality: number) {
         let w0 = 2 * Math.PI * center_frequency / sampling_frequency
         let alpha = Math.sin(w0) / (2 * quality)
@@ -126,9 +122,7 @@ class Biquad {
 
     public static construct(type: string, freq: number, sampling_rate: number, q: number, gain: number) {
         const b = new Biquad()
-        if (type === "Preamp") {
-            b.setPreamp(gain)
-        } else if (type === "APQ" || type === "AP") {
+        if (type === "APQ" || type === "AP") {
             b.setAP(freq, sampling_rate, q)
         } else if (type === "LPQ" || type === "LP") {
             b.setLP(freq, sampling_rate, q)
@@ -152,7 +146,18 @@ class Biquad {
 }
 
 export class Biquads {
-    constructor(private readonly biquads: Biquad[], private readonly samplingRate: number) {}
+    constructor(private readonly biquads: Biquad[], private readonly samplingRate: number, private readonly preampGain: number) {}
+
+    get biquadCount() {
+        return this.biquads.length
+    }
+
+    applyBiquad(frequency: number, biquadIdx: number) {
+        const angle = frequency / this.samplingRate * 2 * Math.PI;
+        const w0 = new Complex(Math.cos(angle), Math.sin(angle))
+        let transfer = this.biquads[biquadIdx].transfer(w0)
+        return [transfer.abs(), transfer.arg()]
+    }
 
     /**
      * Return [mag, angle] representation of the effect the filter has on given frequency
@@ -170,14 +175,15 @@ export class Biquads {
         return [transfer.abs(), transfer.arg()]
     }
 
-    public static fromApoConfig(apoConfig: string, samplingRate: number) {
+    static fromApoConfig(apoConfig: string, samplingRate: number) {
         const biquad: Biquad[] = [];
         const filters = apoConfig.split(/\s*\n/).filter(r => /^Filter\s+\d+:\s+ON\s+|^Preamp:\s+/.exec(r))
 
+        let preampGain = 1
         for (let line of filters) {
             const row = line.split(/\s+/)
-            if (row[0] === "Preamp:" && row[2] === "dB") {                
-                biquad.push(Biquad.construct("Preamp", 0, 0, 0, parseFloat(row[1])));
+            if (row[0] === "Preamp:" && row[2] === "dB") {
+                preampGain = 10 ** (parseFloat(row[1]) / 20)
             } else if (row[0] === "Filter") {
                 let type = row[3]
                 let freq = 0
@@ -206,7 +212,7 @@ export class Biquads {
             }
         }
 
-        return new Biquads(biquad, samplingRate)
+        return new Biquads(biquad, samplingRate, preampGain)
     }
 }
 

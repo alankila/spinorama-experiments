@@ -1,9 +1,9 @@
 <script setup lang="ts">
 
 import { computed, ref } from "vue";
-import { readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata, iirAppliedSpin as iirApplied } from "@/util/spinorama";
+import { readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata, iirAppliedSpin, iirToSpin, type SpinoramaData } from "@/util/spinorama";
 import { useRouter } from "vue-router";
-import { compute_cea2034 as computeCea2034, estimated_inroom as estimateInRoom } from "@/util/cea2034";
+import { compute_cea2034 as computeCea2034, estimated_inroom as estimateInRoom, type Spin } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
 import { Biquads } from "@/util/iir";
 import Graph from "@/components/Graph.vue";
@@ -17,6 +17,8 @@ const showNormalized = ref(false);
 let horizSpin = emptySpinorama;
 let vertSpin = emptySpinorama;
 let biquads: Biquads | undefined
+let iirSpin: SpinoramaData<{ [key: string]: Map<number, number> }> | undefined;
+
 try {
   const baseMeasurement = router.resolve("/").href + `measurements/${speakerId}/${measurementId}.zip`;
   [horizSpin, vertSpin] = await readSpinoramaData(baseMeasurement)
@@ -29,6 +31,7 @@ try {
   const iirRequest = await fetch(baseEq)
   const apoConfig = await iirRequest.text()
   biquads = Biquads.fromApoConfig(apoConfig, 48000)
+  iirSpin = iirToSpin(horizSpin.freq, biquads)
 }
 catch (error) {
   console.log(error);
@@ -40,7 +43,7 @@ const horizontalContour = computed(() => {
   if (showNormalized.value) {
     return normalizedToOnAxis(horizSpin);
   } else if (biquads && applyIir.value) {
-    return iirApplied(horizSpin, biquads);
+    return iirAppliedSpin(horizSpin, biquads);
   } else {
     return horizSpin;
   }
@@ -50,7 +53,7 @@ const verticalContour = computed(() => {
   if (showNormalized.value) {
     return normalizedToOnAxis(vertSpin);
   } else if (biquads && applyIir.value) {
-    return iirApplied(vertSpin, biquads);
+    return iirAppliedSpin(vertSpin, biquads);
   } else {
     return vertSpin;
   }
@@ -129,6 +132,11 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
       <div class="card">
         <h1>Vertical contour</h1>
         <Graph :spin="verticalContour" :render="renderContour" :datasets="[]" />
+      </div>
+
+      <div class="card" v-if="iirSpin">
+        <h1>AutoEQ IIR filters</h1>
+        <Graph :spin="iirSpin" :render="renderFreqPlot" :datasets="Object.keys(iirSpin.datasets)" :domain="{ min: -10, max: 10 }" />
       </div>
     </div>
   </div>

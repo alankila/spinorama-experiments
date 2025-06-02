@@ -3,7 +3,6 @@ import { type Spin } from "./cea2034";
 import _metadata from "@/metadata.json"
 import type { Biquads } from "./iir";
 import { iter } from "but-unzip";
-import { map } from "d3";
 
 export const metadata = _metadata
 
@@ -296,6 +295,36 @@ export function iirAppliedSpin(spin: SpinoramaData<Spin>, biquads: Biquads) {
   setToMeanOnAxisLevel(spin)
 
   console.timeEnd("copy + iir + normalize")
+  return spin
+}
+
+/**
+ * Return "spins" of the IIR, in keys Filter, Filter 1, Filter 2, Filter 3, ...
+ * 
+ * @param freq 
+ * @param biquads 
+ */
+export function iirToSpin(freq: number[], biquads: Biquads) {
+  let map = new Map<number, number>()
+  for (let k of freq) {
+    let xfer = biquads.transfer(k)
+    map.set(k, Math.log(xfer[0]) / Math.log(10) * 20)
+  }
+
+  let spin: SpinoramaData<{ [key: string]: Map<number,number> }> = {
+    freq: [...freq],
+    datasets: { Overall: map },
+  }
+
+  for (let i = 0; i < biquads.biquadCount; i ++) {
+    let map = new Map<number, number>()
+    for (let k of freq) {
+      let xfer = biquads.applyBiquad(k, i)
+      map.set(k, Math.log(xfer[0]) / Math.log(10) * 20)
+    }
+    spin.datasets[`Filter ${i+1}`] = map
+  }
+
   return spin
 }
 

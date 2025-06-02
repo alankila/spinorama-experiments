@@ -14,7 +14,12 @@ const marginRight = 40
 const marginBottom = 40
 const marginLeft = 40
 
-export type GraphType<T extends { [key: string]: Map<number, number> }> = (svg: SVGSVGElement, spin: SpinoramaData<T>, datasets: readonly (keyof T)[], regression?: { min: number, max: number }) => void;
+export type GraphType<T extends { [key: string]: Map<number, number> }> = (svg: SVGSVGElement, spin: SpinoramaData<T>, datasets: readonly (keyof T & string)[], regression?: { min: number, max: number }, domain?: Domain) => void;
+
+export interface Domain {
+  min: number,
+  max: number,
+}
 
 /** Prepare SVG for content */
 function prepareGraph(svg: SVGSVGElement, fill?: string) {
@@ -46,12 +51,12 @@ function prepareGraph(svg: SVGSVGElement, fill?: string) {
   return { graph, width, height }
 }
 
-export function renderFreqPlot<T extends { [key: string]: Map<number, number> }>(svg: SVGSVGElement, spin: SpinoramaData<T>, datasets: readonly (keyof T & string)[], regression?: { min: number, max: number }) {
+export function renderFreqPlot<T extends { [key: string]: Map<number, number> }>(svg: SVGSVGElement, spin: SpinoramaData<T>, datasets: readonly (keyof T & string)[], regression?: Domain, domain?: Domain) {
   const { graph, width, height } = prepareGraph(svg)
 
   /* x & y scales, color scale for graphs, and coordinates for labels */
   const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight])
-  const y = d3.scaleLinear([-45, 5], [height - marginBottom, marginTop])
+  const y = d3.scaleLinear([domain?.min ?? -45, domain?.max ?? 5], [height - marginBottom, marginTop])
   const z = d3.scaleOrdinal(d3.schemeCategory10).domain(datasets)
 
   /* line constructor */
@@ -62,46 +67,46 @@ export function renderFreqPlot<T extends { [key: string]: Map<number, number> }>
   if (regression) {
     /* regression is expecting just 1 dataset */
     for (let ds of datasets) {
-    const predictor = d3reg.regressionLinear()
-    .x((d: number[]) => Math.log2(d[0]))
-    .y((d: number[]) => d[1])
-    ([...spin.datasets[ds].entries()].filter(data => data[0] >= regression.min && data[0] <= regression.max));
+      const predictor = d3reg.regressionLinear()
+      .x((d: number[]) => Math.log2(d[0]))
+      .y((d: number[]) => d[1])
+      ([...spin.datasets[ds].entries()].filter(data => data[0] >= regression.min && data[0] <= regression.max));
 
-    let coords = line([[10, predictor.predict(Math.log2(10))], [40000, predictor.predict(Math.log2(40000))]]);
+      let coords = line([[10, predictor.predict(Math.log2(10))], [40000, predictor.predict(Math.log2(40000))]]);
 
-    graph.append("path")
-    .attr("clip-path", "url(#cut-graph)")
-    .attr("stroke", "#cec")
-    .attr("stroke-width", y(-6) - y(0))
-    .attr("d", coords);
+      graph.append("path")
+      .attr("clip-path", "url(#cut-graph)")
+      .attr("stroke", "#cec")
+      .attr("stroke-width", y(-6) - y(0))
+      .attr("d", coords);
 
-    graph.append("path")
-    .attr("clip-path", "url(#cut-graph)")
-    .attr("stroke", "#ada")
-    .attr("stroke-width", y(-3) - y(0))
-    .attr("d", coords);
+      graph.append("path")
+      .attr("clip-path", "url(#cut-graph)")
+      .attr("stroke", "#ada")
+      .attr("stroke-width", y(-3) - y(0))
+      .attr("d", coords);
 
-    graph.append("path")
-    .attr("clip-path", "url(#cut-graph)")
-    .attr("stroke", "black")
-    .attr("stroke-width", 1)
-    .attr("stroke-dasharray", "3,3")
-    .attr("d", coords);
+      graph.append("path")
+      .attr("clip-path", "url(#cut-graph)")
+      .attr("stroke", "black")
+      .attr("stroke-width", 1)
+      .attr("stroke-dasharray", "3,3")
+      .attr("d", coords);
 
-    /* FIXME: these lines should be projected perpendicular to the regression normal. They could be slightly off if the line is very steep. */
-    graph.append("path")
-    .attr("clip-path", "url(#cut-graph)")
-    .attr("stroke", "#484")
-    .attr("stroke-width", "2")
-    .attr("stroke-dasharray", "10,5")
-    .attr("d", line([[300, predictor.predict(Math.log2(300)) - 3], [5000, predictor.predict(Math.log2(5000)) - 3]]))
+      /* FIXME: these lines should be projected perpendicular to the regression normal. They could be slightly off if the line is very steep. */
+      graph.append("path")
+      .attr("clip-path", "url(#cut-graph)")
+      .attr("stroke", "#484")
+      .attr("stroke-width", "2")
+      .attr("stroke-dasharray", "10,5")
+      .attr("d", line([[300, predictor.predict(Math.log2(300)) - 3], [5000, predictor.predict(Math.log2(5000)) - 3]]))
 
-    graph.append("path")
-    .attr("clip-path", "url(#cut-graph)")
-    .attr("stroke", "#484")
-    .attr("stroke-width", "2")
-    .attr("stroke-dasharray", "10,5")
-    .attr("d", line([[300, predictor.predict(Math.log2(300)) + 3], [5000, predictor.predict(Math.log2(5000)) + 3]]))
+      graph.append("path")
+      .attr("clip-path", "url(#cut-graph)")
+      .attr("stroke", "#484")
+      .attr("stroke-width", "2")
+      .attr("stroke-dasharray", "10,5")
+      .attr("d", line([[300, predictor.predict(Math.log2(300)) + 3], [5000, predictor.predict(Math.log2(5000)) + 3]]))
     }
   }
 
