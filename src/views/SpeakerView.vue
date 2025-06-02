@@ -1,7 +1,7 @@
 <script setup lang="ts">
 
 import { computed, ref } from "vue";
-import { setToMeanOnAxisLevel, readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata, iirAppliedSpin as iirApplied } from "@/util/spinorama";
+import { readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata, iirAppliedSpin as iirApplied } from "@/util/spinorama";
 import { useRouter } from "vue-router";
 import { compute_cea2034 as computeCea2034, estimated_inroom as estimateInRoom } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
@@ -14,18 +14,14 @@ const router = useRouter();
 const applyIir = ref(false);
 const showNormalized = ref(false);
 
-let horizontalContourOriginal = emptySpinorama;
-let verticalContourOriginal = emptySpinorama;
+let horizSpin = emptySpinorama;
+let vertSpin = emptySpinorama;
 let biquads: Biquads | undefined
 try {
-  const baseMeasurement = router.resolve("/").href + `measurements/${speakerId}/${measurementId}/`;
-  horizontalContourOriginal = await readSpinoramaData(baseMeasurement + "SPL Horizontal.txt")
-  setToMeanOnAxisLevel(horizontalContourOriginal);
+  const baseMeasurement = router.resolve("/").href + `measurements/${speakerId}/${measurementId}.zip`;
+  [horizSpin, vertSpin] = await readSpinoramaData(baseMeasurement)
 
-  verticalContourOriginal = await readSpinoramaData(baseMeasurement + "SPL Vertical.txt")
-  setToMeanOnAxisLevel(verticalContourOriginal);
-
-  if ("" + horizontalContourOriginal.freq != "" + verticalContourOriginal.freq) {
+  if ("" + horizSpin.freq != "" + vertSpin.freq) {
     throw new Error("Frequency data mismatch between SPL Horizontal and Vertical!");
   }
 
@@ -42,21 +38,21 @@ catch (error) {
 /* Not affected by eq, so cached as-is */
 const horizontalContour = computed(() => {
   if (showNormalized.value) {
-    return normalizedToOnAxis(horizontalContourOriginal);
+    return normalizedToOnAxis(horizSpin);
   } else if (biquads && applyIir.value) {
-    return iirApplied(horizontalContourOriginal, biquads);
+    return iirApplied(horizSpin, biquads);
   } else {
-    return horizontalContourOriginal;
+    return horizSpin;
   }
 });
 
 const verticalContour = computed(() => {
   if (showNormalized.value) {
-    return normalizedToOnAxis(verticalContourOriginal);
+    return normalizedToOnAxis(vertSpin);
   } else if (biquads && applyIir.value) {
-    return iirApplied(verticalContourOriginal, biquads);
+    return iirApplied(vertSpin, biquads);
   } else {
-    return verticalContourOriginal;
+    return vertSpin;
   }
 });
 

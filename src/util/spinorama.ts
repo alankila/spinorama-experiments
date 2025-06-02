@@ -1,7 +1,8 @@
 import { parse } from "papaparse";
-import { sp_weigths, type Spin } from "./cea2034";
+import { type Spin } from "./cea2034";
 import _metadata from "@/metadata.json"
 import type { Biquads } from "./iir";
+import { iter } from "but-unzip";
 
 export const metadata = _metadata
 
@@ -37,40 +38,128 @@ function cloneSpinorama(data: SpinoramaData<Spin>): SpinoramaData<Spin> {
   }
 }
 
-export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin>> {
+async function unzip(data: Uint8Array) {
+  const txtFiles: { [key: string]: string } = {}
+
+  for (const entry of iter(data)) {
+    const bytes = await entry.read();
+    /* We should not have any encoding issues with the numeric data. Files should be treatable as ISO-8859-1 */
+    const txtData = String.fromCharCode(...bytes)
+    txtFiles[entry.filename] = txtData
+  }
+
+  return txtFiles
+}
+
+export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin>[]> {
   const graphResult = await fetch(encodeURI(url))
   if (graphResult.status != 200) {
     throw new Error(`Unable to find data: ${url}: ${graphResult.status} ${graphResult.statusText}`)
   }
-  const csv = (await graphResult.text()).replace(/\s+$/, "")
-  if (!csv.startsWith('"')) {
-    throw new Error(`Bogus result for url: ${url}: ${csv}`)
+  const binaryData = await graphResult.bytes()
+  const files = await unzip(binaryData)
+
+  let spins: SpinoramaData<Spin>[];
+
+  /* Klippel format -- this is among the most convenient for us */
+  if ("SPL Horizontal.txt" in files && "SPL Vertical.txt" in files) {
+    const horizSpin = readKlippel(files["SPL Hoziontal.txt"])
+    const vertSpin = readKlippel(files["SPL Vertical.txt"])
+    spins = [horizSpin, vertSpin]
+  } else if (Object.keys(files).filter(f => / _H 0.txt/.test(f))) {
+    spins = readSplHvTxt(files)
+  } else {
+    throw new Error("Unknown file format");
   }
 
+  for (let spin of spins) {
+    /* Ensure frequencies appear in ascending order */
+    spin.freq.sort((a, b) => a - b)
+
+    /* Ensure that all datasets are in fact present */
+    let refSpin = spins[0]
+
+    for (let ds of spinKeys) {
+      if ("" + spin.freq != "" + refSpin.freq) {
+        throw new Error(`Inconsistent use of frequencies across datasets`)
+      }
+      if (!(ds in spin.datasets)) {
+        throw new Error(`Missing a dataset: ${ds}`)
+      }
+      if (spin.datasets[ds].size !== refSpin.datasets[ds].size) {
+        throw new Error(`Dataset length is not correct between horiz/vert spins: ${ds}`)
+      }
+    }
+
+    setToMeanOnAxisLevel(spin)
+  }
+
+  return spins
+}
+
+function readSplHvTxt(files: { [key: string]: string }) {
+  let horizSpin: SpinoramaData<Spin> = {
+    freq: [],
+    // @ts-ignore
+    datasets: {},
+  }
+  let vertSpin: SpinoramaData<Spin> = {
+    freq: [],
+    // @ts-ignore
+    datasets: {},
+  }
+  for (let dir of ["H", "V"]) {
+    let spin = dir === "H" ? horizSpin : vertSpin
+    for (let angle of spinKeys) {
+      let name = ` _${dir} ${angle == 'On-Axis' ? 0 : angle.replace("°", "")}.txt`
+      
+      let data = Object.entries(files).find(f => f[0].endsWith(name))
+      if (!data) {
+        throw new Error(`Was not able to find measurement angle ${name} in GLL data`)
+      }
+
+      let map = new Map()
+      for (let row of data[1].split(/\s*\n/)) {
+        if (!row) {
+          continue
+        }
+        let [freq, mag, _pha] = row.split(/\s+/).map(v => parseFloat(v))
+        spin.freq.push(freq)
+        map.set(freq, mag)
+      }
+      spin.datasets[angle] = map
+    }
+  }
+
+  return [horizSpin, vertSpin]
+}
+
+function readKlippel(csv: string) {
   let data = parse<string[]>(csv, { delimiter: "\t" }).data
   let title = data.shift() ?? ""
   let datasets = data.shift() ?? []
   let headers = data.shift() ?? []
   console.log("Processing dataset", title, "with shape", headers)
 
-  /* Spinorama's data format explanation. File is tab-separated CSV collection of data points.
-   * Usually, multiple datasets are stored in each file. Format has 3 header rows, followed by the data rows.
-   * 
-   * The first row labels the dataset (1 column in CSV)
-   * 
-   * Second row indicates starts indexes of each datasets.
-   * The cell is empty if that column belongs to the preceding dataset.
-   * 
+  /* Klippel files are tab-separated CSV collection of datasets with at least 2 points per set,
+   * stored in adjacent columns.
+   *
+   * Format has 3 header rows, followed by the data rows. The first row labels the dataset (1 column in CSV)
+   * Second row indicates starts indexes of each datasets. The cell is empty if that column belongs to the preceding dataset.
    * The third row labels the data rows, and is like a traditional CSV header.
    * 
    * Data rows are formatted in U.S. numeric format with thousands separator,
-   * e.g. 1,234.56.
+   * e.g. 1,234.56. We assume data can be interpreted as (Hz, SPL) pairs, for each 10 degree angle.
    */
   const output: SpinoramaData<Spin> = {
     freq: [],
     // @ts-ignore filling in datasets below
     datasets: {},
   }
+  for (let ds of spinKeys) {
+    output.datasets[ds] = new Map();
+  }
+
   for (let i = 0; i < datasets.length; i += 2) {
     if (datasets[i+1]) {
       throw new Error(`Unexpected dataset name at index ${i+1}`);
@@ -79,10 +168,8 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
     /* Note: this assertion is hypothetical; we validate it now. */
     let d = datasets[i] as keyof Spin;
     if (spinKeys.indexOf(d) === -1) {
-      throw new Error(`Unsupported dataset in ${url}: ${d}`)
+      throw new Error(`Unsupported dataset: ${d}`)
     }
-
-    output.datasets[d] = new Map()
   }
 
   /* Validate that all frequencies are used consistently, and create Map containers from the data */
@@ -103,21 +190,6 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
     count ++;
   }
 
-  /* Ensure that all datasets are in fact present */
-  for (let ds of spinKeys) {
-    if (!(ds in output.datasets)) {
-      throw new Error(`Missing a dataset: ${ds}`)
-    }
-
-    const cmpCount = output.datasets[ds].size
-    if (cmpCount !== count) {
-      throw new Error(`Dataset length is not correct, expected ${count} but had ${cmpCount} in ${ds}`)
-    }
-  }
-
-  /* Ensure frequencies appear in ascending order */
-  output.freq.sort((a, b) => a - b)
-
   return output
 }
 
@@ -126,7 +198,7 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
  *
  * @param spin 
  */
-export function setToMeanOnAxisLevel(spin: SpinoramaData<Spin>) {
+function setToMeanOnAxisLevel(spin: SpinoramaData<Spin>) {
   let ds = spin.datasets["On-Axis"]
 
   let avg = 0;

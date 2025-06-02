@@ -23,6 +23,11 @@ function flatness(speaker: typeof metadata[keyof typeof metadata]) {
   return measurement?.ref_band?.toFixed(1)
 }
 
+function format(speaker: typeof metadata[keyof typeof metadata]) {
+  // @ts-ignore
+  return speaker.measurements[speaker.default_measurement]?.format;
+}
+
 </script>
 
 <template>
@@ -39,10 +44,14 @@ function flatness(speaker: typeof metadata[keyof typeof metadata]) {
         Bass extension: <span class="bold">{{ bassExtension(speaker) }}</span> Hz<br/>
         Flatness: <span class="bold">&pm;{{ flatness(speaker) }}</span> dB</br>
       </div>
-      <div class="link"><RouterLink :to="`view/${encodeURI(speakerId)}/${encodeURI(speaker.default_measurement)}`">{{ speaker.default_measurement }}</RouterLink></div>
+      <div class="link">
+        <RouterLink :to="`view/${encodeURI(speakerId)}/${encodeURI(speaker.default_measurement)}`">
+          {{ speaker.default_measurement }}
+        </RouterLink>
+        <span :class="['klippel', 'spl_hv_txt'].indexOf(format(speaker)) !== -1 ? 'ok' : 'error'">({{ format(speaker) }})</span>
+      </div>
     </div>
   </div>
-
 </template>
 
 <style scoped>
@@ -80,6 +89,13 @@ function flatness(speaker: typeof metadata[keyof typeof metadata]) {
 
 .card .bold {
   font-weight: bold;
+}
+
+.ok {
+  color: green;
+}
+.error {
+  color: red;
 }
 
 </style>
