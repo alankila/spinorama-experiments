@@ -3,6 +3,7 @@ import { type Spin } from "./cea2034";
 import _metadata from "@/metadata.json"
 import type { Biquads } from "./iir";
 import { iter } from "but-unzip";
+import { map } from "d3";
 
 export const metadata = _metadata
 
@@ -44,13 +45,15 @@ async function unzip(data: Uint8Array) {
   for (const entry of iter(data)) {
     const bytes = await entry.read();
     const txtData = new TextDecoder("utf-8").decode(bytes)
-    txtFiles[entry.filename] = txtData
+    txtFiles[entry.filename] = txtData.trimEnd()
   }
 
   return txtFiles
 }
 
 export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin>[]> {
+  console.time("load")
+
   const graphResult = await fetch(encodeURI(url))
   if (graphResult.status != 200) {
     throw new Error(`Unable to find data: ${url}: ${graphResult.status} ${graphResult.statusText}`)
@@ -72,27 +75,36 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
   }
 
   for (let spin of spins) {
+    spin.freq = [...spin.datasets["On-Axis"].keys()]
+    if (spin.freq.length < 20) {
+      throw new Error("Too few frequencies discovered!");
+    }
+
     /* Ensure frequencies appear in ascending order */
     spin.freq.sort((a, b) => a - b)
 
-    /* Ensure that all datasets are in fact present */
-    let refSpin = spins[0]
-
     for (let ds of spinKeys) {
-      if ("" + spin.freq != "" + refSpin.freq) {
-        throw new Error(`Inconsistent use of frequencies across datasets`)
-      }
       if (!(ds in spin.datasets)) {
         throw new Error(`Missing a dataset: ${ds}`)
       }
-      if (spin.datasets[ds].size !== refSpin.datasets[ds].size) {
-        throw new Error(`Dataset length is not correct between horiz/vert spins: ${ds}`)
+      let freq = [...spin.datasets[ds].keys()];
+      freq.sort((a, b) => a - b)
+      if (JSON.stringify(freq) !== JSON.stringify(spin.freq)) {
+        throw new Error(`Dataset frequencies are not same as in the spin in general on dataset: ${ds}`)
       }
     }
 
+    /* Normalize to 0 dB level (FIXME: should we use common normalization factor for both spins?) */
     setToMeanOnAxisLevel(spin)
   }
 
+  if (JSON.stringify(spins[0].freq) !== JSON.stringify(spins[1].freq)) {
+    throw new Error(`Inconsistent use of frequencies across datasets`)
+  }
+
+  console.log(spins[0].freq.length * spinKeys.length * 2, "datapoints loaded over", spins[0].freq.length, "frequencies covering range", spins[0].freq[0], "Hz -", spins[0].freq[spins[0].freq.length - 1], "Hz")
+
+  console.timeEnd("load")
   return spins
 }
 
@@ -119,11 +131,13 @@ function readSplHvTxt(files: { [key: string]: string }) {
 
       let map = new Map()
       for (let row of data[1].split(/\s*\n/)) {
-        if (!row) {
+        if (row.startsWith("Freq")) {
           continue
         }
         let [freq, mag, _pha] = row.split(/\s+/).map(v => parseFloat(v))
-        spin.freq.push(freq)
+        if (!freq || !mag) {
+          throw new Error(`Unable to process row ${row}`)
+        }
         map.set(freq, mag)
       }
       spin.datasets[angle] = map
@@ -138,7 +152,6 @@ function readKlippel(csv: string) {
   let title = data.shift() ?? ""
   let datasets = data.shift() ?? []
   let headers = data.shift() ?? []
-  console.log("Processing dataset", title, "with shape", headers)
 
   /* Klippel files are tab-separated CSV collection of datasets with at least 2 points per set,
    * stored in adjacent columns.
@@ -175,7 +188,6 @@ function readKlippel(csv: string) {
   let count = 0;
   for (let row of data) {
     let freq = parseFloat(row[0].replace(",", ""))
-    output.freq.push(freq)
     for (let i = 0; i < row.length; i += 2) {
       if (freq !== parseFloat(row[i].replace(",", ""))) {
         throw new Error(`Inconsistent frequency data: ${freq} vs ${row[i]}`)
@@ -223,6 +235,7 @@ function setToMeanOnAxisLevel(spin: SpinoramaData<Spin>) {
  * @returns spin with IIR applied
  */
 export function iirAppliedSpin(spin: SpinoramaData<Spin>, biquads: Biquads) {
+  console.time("copy + iir + normalize")
   spin = cloneSpinorama(spin)
 
   let val = new Map<number, number>()
@@ -237,6 +250,7 @@ export function iirAppliedSpin(spin: SpinoramaData<Spin>, biquads: Biquads) {
 
   setToMeanOnAxisLevel(spin)
 
+  console.timeEnd("copy + iir + normalize")
   return spin
 }
 
@@ -247,6 +261,7 @@ export function iirAppliedSpin(spin: SpinoramaData<Spin>, biquads: Biquads) {
  * @returns new spin with relative levels to On-Axis measurement
  */
 export function normalizedToOnAxis(spin: SpinoramaData<Spin>) {
+  console.time("copy + normalize")
   spin = cloneSpinorama(spin)
 
   let onAxis = spin.datasets["On-Axis"]
@@ -258,5 +273,6 @@ export function normalizedToOnAxis(spin: SpinoramaData<Spin>) {
   }
 
   onAxis.forEach((_, k) => onAxis.set(k, 0))
+  console.timeEnd("copy + normalize")
   return spin
 }
