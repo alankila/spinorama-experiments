@@ -48,7 +48,7 @@ function format(speaker: typeof metadata[keyof typeof metadata]) {
         <RouterLink :to="`view/${encodeURI(speakerId)}/${encodeURI(speaker.default_measurement)}`">
           {{ speaker.default_measurement }}
         </RouterLink>
-        <span :class="['klippel', 'spl_hv_txt'].indexOf(format(speaker)) !== -1 ? 'ok' : 'error'">({{ format(speaker) }})</span>
+        <span :class="['klippel', 'spl_hv_txt', 'gll_hv_txt'].indexOf(format(speaker)) !== -1 ? 'ok' : 'error'">({{ format(speaker) }})</span>
       </div>
     </div>
   </div>

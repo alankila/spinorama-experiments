@@ -12,7 +12,7 @@ SELF="$PWD"
 
 echo "Copying SPL files over"
 rm -rf "$SELF/public/measurements"
-rsync -a "$SPINORAMA/datas/measurements" "$SELF/public" --include 'SPL Horizontal.txt' --include 'SPL Vertical.txt' --include '* _H *.txt' --include '* _V *.txt' --exclude '*.*' --exclude tmp -L
+rsync -a "$SPINORAMA/datas/measurements" "$SELF/public" --include 'SPL Horizontal.txt' --include 'SPL Vertical.txt' --include '*-M*-P*.txt' --include '* _H *.txt' --include '* _V *.txt' --exclude '*.*' -L
 
 echo "Compressing measurements into zip archives"
 for dir in "$SELF/public/measurements"/*/*; do

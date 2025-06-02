@@ -68,8 +68,10 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
     const horizSpin = readKlippel(files["SPL Horizontal.txt"])
     const vertSpin = readKlippel(files["SPL Vertical.txt"])
     spins = [horizSpin, vertSpin]
-  } else if (Object.keys(files).filter(f => / _H 0.txt/.test(f))) {
+  } else if (Object.keys(files).find(f => f.endsWith("_H 0.txt"))) {
     spins = readSplHvTxt(files)
+  } else if (Object.keys(files).find(f => f.endsWith("-M0-P0.txt"))) {
+    spins = readGllHvTxt(files)
   } else {
     throw new Error("Unknown file format");
   }
@@ -126,7 +128,7 @@ function readSplHvTxt(files: { [key: string]: string }) {
       
       let data = Object.entries(files).find(f => f[0].endsWith(name))
       if (!data) {
-        throw new Error(`Was not able to find measurement angle ${name} in GLL data`)
+        throw new Error(`Was not able to find measurement angle ${name} in SPL HV data ${Object.keys(files)}`)
       }
 
       let map = new Map()
@@ -135,7 +137,50 @@ function readSplHvTxt(files: { [key: string]: string }) {
           continue
         }
         let [freq, mag, _pha] = row.split(/\s+/).map(v => parseFloat(v))
-        if (!freq || !mag) {
+        if (!freq) {
+          throw new Error(`Unable to process row ${row}`)
+        }
+        map.set(freq, mag)
+      }
+      spin.datasets[angle] = map
+    }
+  }
+
+  return [horizSpin, vertSpin]
+}
+
+function readGllHvTxt(files: { [key: string]: string }) {
+  let horizSpin: SpinoramaData<Spin> = {
+    freq: [],
+    // @ts-ignore
+    datasets: {},
+  }
+  let vertSpin: SpinoramaData<Spin> = {
+    freq: [],
+    // @ts-ignore
+    datasets: {},
+  }
+  for (let dir of ["H", "V"]) {
+    let spin = dir === "H" ? horizSpin : vertSpin
+    for (let angle of spinKeys) {
+      let m = dir === "H" ? 0 : 90
+      if (angle.startsWith("-")) {
+        m += 180
+      }
+      let p = Math.abs(angle === "On-Axis" ? 0 : Math.abs(parseFloat(angle.replace("°", ""))))
+      let name = `-M${m}-P${p}.txt`;      
+      let data = Object.entries(files).find(f => f[0].endsWith(name))
+      if (!data) {
+        throw new Error(`Was not able to find measurement angle ${name} in GLL HV data`)
+      }
+
+      let map = new Map()
+      for (let row of data[1].split(/\s*\n/)) {
+        if (!row || row.startsWith("Freq") || row.startsWith("Data") || row.startsWith("Display")) {
+          continue
+        }
+        let [freq, mag, _pha] = row.split(/\s+/).map(v => parseFloat(v))
+        if (!freq) {
           throw new Error(`Unable to process row ${row}`)
         }
         map.set(freq, mag)
@@ -149,9 +194,9 @@ function readSplHvTxt(files: { [key: string]: string }) {
 
 function readKlippel(csv: string) {
   let data = parse<string[]>(csv, { delimiter: "\t" }).data
-  let title = data.shift() ?? ""
+  let _title = data.shift() ?? ""
   let datasets = data.shift() ?? []
-  let headers = data.shift() ?? []
+  let _headers = data.shift() ?? []
 
   /* Klippel files are tab-separated CSV collection of datasets with at least 2 points per set,
    * stored in adjacent columns.
