@@ -3,7 +3,7 @@
 import { computed, ref } from "vue";
 import { readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata, iirAppliedSpin, iirToSpin, type SpinoramaData } from "@/util/spinorama";
 import { useRouter } from "vue-router";
-import { compute_cea2034 as computeCea2034, estimated_inroom as estimateInRoom, type Spin } from "@/util/cea2034";
+import { compute_cea2034 as computeCea2034, estimated_inroom as estimateInRoom } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
 import { Biquads } from "@/util/iir";
 import Graph from "@/components/Graph.vue";
@@ -22,10 +22,6 @@ let iirSpin: SpinoramaData<{ [key: string]: Map<number, number> }> | undefined;
 try {
   const baseMeasurement = router.resolve("/").href + `measurements/${speakerId}/${measurementId}.zip`;
   [horizSpin, vertSpin] = await readSpinoramaData(baseMeasurement)
-
-  if ("" + horizSpin.freq != "" + vertSpin.freq) {
-    throw new Error("Frequency data mismatch between SPL Horizontal and Vertical!");
-  }
 
   const baseEq = router.resolve("/").href + `eq/${speakerId}/iir-autoeq.txt`;
   const iirRequest = await fetch(baseEq)

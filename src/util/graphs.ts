@@ -12,7 +12,7 @@ const aspectRatio = 2
 const marginTop = 8
 const marginRight = 40
 const marginBottom = 40
-const marginLeft = 40
+const marginLeft = 60
 
 export type GraphType<T extends { [key: string]: Map<number, number> }> = (svg: SVGSVGElement, spin: SpinoramaData<T>, datasets: readonly (keyof T & string)[], regression?: { min: number, max: number }, domain?: Domain) => void;
 

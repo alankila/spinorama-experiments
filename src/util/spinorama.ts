@@ -299,7 +299,7 @@ export function iirAppliedSpin(spin: SpinoramaData<Spin>, biquads: Biquads) {
 }
 
 /**
- * Return "spins" of the IIR, in keys Filter, Filter 1, Filter 2, Filter 3, ...
+ * Return "spins" of the IIR, in keys Overall, Filter 1, Filter 2, Filter 3, ...
  * 
  * @param freq 
  * @param biquads 

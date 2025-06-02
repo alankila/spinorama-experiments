@@ -1,18 +1,20 @@
 import { Complex } from "complex.js";
 
+const ZERO = new Complex(0);
+const ONE = new Complex(1);
 class Biquad {
-    private a1 = 0
-    private a2 = 0
-    private b0 = 1
-    private b1 = 0
-    private b2 = 0
+    private a1 = ZERO
+    private a2 = ZERO
+    private b0 = ONE
+    private b1 = ZERO
+    private b2 = ZERO
 
     private set(a0: number, a1: number, a2: number, b0: number, b1: number, b2: number) {
-        this.a1 = a1/a0
-        this.a2 = a2/a0
-        this.b0 = b0/a0
-        this.b1 = b1/a0
-        this.b2 = b2/a0
+        this.a1 = new Complex(a1/a0)
+        this.a2 = new Complex(a2/a0)
+        this.b0 = new Complex(b0/a0)
+        this.b1 = new Complex(b1/a0)
+        this.b2 = new Complex(b2/a0)
     }
 
     private setLP(center_frequency: number, sampling_frequency: number, quality: number) {
@@ -115,8 +117,9 @@ class Biquad {
     }
 
     public transfer(z: Complex) {
-        let nom = new Complex(this.b0).add(new Complex(this.b1).div(z)).add(new Complex(this.b2).div(z.mul(z)))
-        let den = new Complex(1).add(new Complex(this.a1).div(z)).add(new Complex(this.a2).div(z.mul(z)))
+        const z2 = z.mul(z)
+        let nom = this.b0.add(this.b1.div(z)).add(this.b2.div(z2))
+        let den = ONE.add(this.a1.div(z)).add(this.a2.div(z2))
         return nom.div(den)
     }
 
@@ -168,7 +171,7 @@ export class Biquads {
     transfer(frequency: number) {
         const angle = frequency / this.samplingRate * 2 * Math.PI;
         const w0 = new Complex(Math.cos(angle), Math.sin(angle))
-        let transfer = new Complex(1, 0)
+        let transfer = ONE
         for (let biquad of this.biquads) {
             transfer = transfer.mul(biquad.transfer(w0))
         }
