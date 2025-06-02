@@ -43,8 +43,7 @@ async function unzip(data: Uint8Array) {
 
   for (const entry of iter(data)) {
     const bytes = await entry.read();
-    /* We should not have any encoding issues with the numeric data. Files should be treatable as ISO-8859-1 */
-    const txtData = String.fromCharCode(...bytes)
+    const txtData = new TextDecoder("utf-8").decode(bytes)
     txtFiles[entry.filename] = txtData
   }
 
@@ -63,7 +62,7 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
 
   /* Klippel format -- this is among the most convenient for us */
   if ("SPL Horizontal.txt" in files && "SPL Vertical.txt" in files) {
-    const horizSpin = readKlippel(files["SPL Hoziontal.txt"])
+    const horizSpin = readKlippel(files["SPL Horizontal.txt"])
     const vertSpin = readKlippel(files["SPL Vertical.txt"])
     spins = [horizSpin, vertSpin]
   } else if (Object.keys(files).filter(f => / _H 0.txt/.test(f))) {
