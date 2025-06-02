@@ -55,8 +55,8 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
   if (graphResult.status != 200) {
     throw new Error(`Unable to find data: ${url}: ${graphResult.status} ${graphResult.statusText}`)
   }
-  const binaryData = await graphResult.bytes()
-  const files = await unzip(binaryData)
+  const binaryData = await graphResult.arrayBuffer()
+  const files = await unzip(new Uint8Array(binaryData))
 
   let spins: SpinoramaData<Spin>[];
 
@@ -110,7 +110,7 @@ function readSplHvTxt(files: { [key: string]: string }) {
   for (let dir of ["H", "V"]) {
     let spin = dir === "H" ? horizSpin : vertSpin
     for (let angle of spinKeys) {
-      let name = ` _${dir} ${angle == 'On-Axis' ? 0 : angle.replace("°", "")}.txt`
+      let name = ` _${dir} ${angle === 'On-Axis' ? 0 : angle.replace("°", "")}.txt`
       
       let data = Object.entries(files).find(f => f[0].endsWith(name))
       if (!data) {
