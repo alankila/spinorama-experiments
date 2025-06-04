@@ -62,11 +62,17 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
 
 </script>
 
-<template>
-  <div class="measurement">
-    <h1 class="title">{{ metadata[speakerId].brand }} {{ metadata[speakerId].model }}</h1>
+  display: grid;
+  grid-template-areas: "title form" "content content";
+  grid-template-columns: max-content 1fr;
+  grid-template-rows: max-content 1fr;
+  max-height: 100vh;
 
-    <div class="form">
+<template>
+  <div class="grid grid-cols-[max-content_1fr] grid-rows-[max-content_1fr] max-h-lvw">
+    <h1 class="font-bold self-center py-4 px-8">{{ metadata[speakerId].brand }} {{ metadata[speakerId].model }}</h1>
+
+    <div class="grid self-center">
       <label>
         <input type="checkbox" v-model="applyIir">
         Apply autoeq parametric equalizer to the measurements
@@ -78,7 +84,7 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
       </label>
     </div>
 
-    <div class="card-container">
+    <div class="bg-spinorama-bg-darker col-span-2 grid gap-4 overflow-y-scroll p-4 justify-center border-t auto-fit-cols">
       <div class="card">
         <h1>CEA2034</h1>
         <Graph :spin="cea2034" :render="renderCea2034Plot" :datasets="[]" />
@@ -140,42 +146,8 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
 
 <style scoped>
 
-div.measurement {
-  display: grid;
-  grid-template-areas: "title form" "content content";
-  grid-template-columns: max-content 1fr;
-  grid-template-rows: max-content 1fr;
-  max-height: 100vh;
-}
-
-h1 {
-  grid-area: title;
-  padding: 0.5em 1em;
-  margin: 0;
-}
-
-h1.title {
-  font-weight: bold;
-  align-self: center;
-}
-
-.form {
-  grid-area: form;
-  display: grid;
-  gap: 0.5em;
-  align-self: center;
-}
-
-.card-container {
-  grid-area: content;
-  border-top: 1px solid black;
-  display: grid;
+.auto-fit-cols {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1200px));
-  gap: 1em;
-  overflow-y: scroll;
-  padding: 1em;
-  justify-content: center;
-  background-color: #ddd;
 }
 
 .card {
