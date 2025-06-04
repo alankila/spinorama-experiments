@@ -40,15 +40,27 @@ function tonalityScore(speaker: Speaker) {
   if (!measurement) {
     return undefined
   }
+
+  /* NBD = narrow band deviation
+   * - split response into half-octave bands covering 100 Hz onwards.
+   * - reject band if its center is outside measurement bound (lowest frequency) or above 12000 Hz.
+   * - measure "mean average difference" of response within each band (subtract from mean, take absolute difference, then calculate the mean of the result)
+   * - then average all bands.
+   * 
+   * smoothness is the r² of the linear regression of the predicted in room response between 100 and 16000 Hz.
+   */
   return (12.69 - 2.49 * measurement.nbd_on_axis - 2.99 * measurement.nbd_pred_in_room - 4.31 * Math.log10(measurement.lfx_hz) + 2.32 * measurement.sm_pred_in_room).toFixed(1)
 }
 
+/* bass extension is estimated by walking down the measurement from 300 Hz and finding the frequency where response is below -6 dB
+ * and then returning the measurement point freq just above that. If response is above -6 dB for the entire range, then return lowest measured frequency. */
 function bassExtension(speaker: Speaker) {
   // @ts-ignore
   const measurement = speaker.measurements[speaker.default_measurement]?.pref_rating
   return measurement?.lfx_hz
 }
 
+/* ref_band is computed from the maximum deviation above/below average in midrange which is 300-5000 Hz */
 function flatness(speaker: Speaker) {
   // @ts-ignore
   const measurement = speaker.measurements[speaker.default_measurement]?.estimates
