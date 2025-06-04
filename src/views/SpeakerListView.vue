@@ -1,7 +1,7 @@
 <script setup lang="ts">
 
 import { metadata } from '@/util/spinorama';
-import { ref, watchEffect, type Ref } from 'vue';
+import { onUnmounted, ref, watchEffect, type Ref } from 'vue';
 
 /**
  * Delay execution of a function by configured delay. New calls reset the delay.
@@ -11,6 +11,14 @@ import { ref, watchEffect, type Ref } from 'vue';
  */
 function debounce<T>(func: (...args: T[]) => void, delay = 300) {
   let timer: any;
+
+  onUnmounted(() => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+  })
+
   return (...args: T[]) => {
     if (timer) {
       clearTimeout(timer)
