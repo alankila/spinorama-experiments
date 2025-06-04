@@ -43,12 +43,5 @@ watchEffect(() => {
 </script>
 
 <template>
-  <svg ref="svg"></svg>
+  <svg class="bg-spinorama-bg text-spinorama-fg w-full" ref="svg"></svg>
 </template>
-
-<style scoped>
-svg {
-  background-color: white;
-  color: black;
-}
-</style>

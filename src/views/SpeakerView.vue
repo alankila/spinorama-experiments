@@ -69,7 +69,7 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
   max-height: 100vh;
 
 <template>
-  <div class="grid grid-cols-[max-content_1fr] grid-rows-[max-content_1fr] max-h-lvw">
+  <div class="grid grid-cols-[max-content_1fr] grid-rows-[max-content_1fr] max-h-lvh">
     <h1 class="font-bold self-center py-4 px-8">{{ metadata[speakerId].brand }} {{ metadata[speakerId].model }}</h1>
 
     <div class="grid self-center">
@@ -146,21 +146,14 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
 
 <style scoped>
 
+@reference "@/assets/main.css";
+
 .auto-fit-cols {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1200px));
 }
 
 .card {
-  background-color: white;
-  border: 1px solid black;
-  border-radius: 1em;
-  box-shadow: 0px 0.5em 1em rgba(0, 0, 0, 0.3);
-  height: content;
-  padding: 0.5em;
-}
-
-.card svg {
-  width: 100%;
+  @apply bg-spinorama-bg border rounded-lg shadow p-4;
 }
 
 </style>
