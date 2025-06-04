@@ -9,7 +9,7 @@ import { onUnmounted, ref, watchEffect, type Ref } from 'vue';
  * @param func  
  * @param delay 
  */
-function debounce<T>(func: (...args: T[]) => void, delay = 300) {
+function debounce<T extends (...args: any) => void>(func: T, delay = 300) {
   let timer: any;
 
   onUnmounted(() => {
@@ -19,7 +19,7 @@ function debounce<T>(func: (...args: T[]) => void, delay = 300) {
     }
   })
 
-  return (...args: T[]) => {
+  return (...args: Parameters<T>) => {
     if (timer) {
       clearTimeout(timer)
     }
