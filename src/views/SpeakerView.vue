@@ -62,12 +62,6 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
 
 </script>
 
-  display: grid;
-  grid-template-areas: "title form" "content content";
-  grid-template-columns: max-content 1fr;
-  grid-template-rows: max-content 1fr;
-  max-height: 100vh;
-
 <template>
   <div class="grid grid-cols-[max-content_1fr] grid-rows-[max-content_1fr] max-h-lvh">
     <h1 class="font-bold self-center py-4 px-8">{{ metadata[speakerId].brand }} {{ metadata[speakerId].model }}</h1>
