@@ -1,33 +1,30 @@
-# spinorama-ng
+# spinorama-experiments
 
-This template should help get you started developing with Vue 3 in Vite.
+This is a work-in-progress study of client side rendering of the entire Spinorama.
 
-## Recommended IDE Setup
+The purpose is to produce TypeScript routines that can read raw measurement data in various formats
+and display them. For this purpose, various CEA2034 related analysis functions have also been
+ported to TypeScript.
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+Goals:
 
-## Type Support for `.vue` Imports in TS
+- All measurement types must be readable, including those that do not have a full spin data
+- Some measurements are incomplete, e.g. missing spin angles, likely due to human error.
+  Approaches for tolerating missing data should be considered.
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+Practical steps:
 
-## Customize configuration
+1. Develop required loaders. Most notable missing types: princeton (impulse response in matlab v4 files), webplot digitizer (various graphs provided for display), rew text dump (similar)
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+2. Develop required analysis functions for pir smoothness, nbd, lfx, etc. estimation
 
-## Project Setup
+3. Replace spinorama metadata generator to cut ties with the old implementation.
 
-```sh
-npm install
-```
+  1. Make offline analysis step that uses all the loaders and the developed analysis functions offline
+     and creates metadata document that replicates the build result from spinorama presently.
 
-### Compile and Hot-Reload for Development
+  2. Various supplementary data for various speakers e.g. Price per unit, Vendor, Model, etc. are needed to maintain usefulness.
+     An issue with pricing data is that it is subject to inflation, customs fees, etc. It might be necessary to adjust these figures over time.
 
-```sh
-npm run dev
-```
+4. Develop every other missing function like tables, statistics, comparison charts, etc. etc. etc.
 
-### Type-Check, Compile and Minify for Production
-
-```sh
-npm run build
-```
