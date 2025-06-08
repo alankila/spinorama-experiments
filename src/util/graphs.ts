@@ -252,11 +252,17 @@ export function renderContour(svg: SVGSVGElement, spin: SpinoramaData<Spin>) {
     "-10°", "-20°", "-30°", "-40°", "-50°", "-60°", "-70°", "-80°", "-90°", "-100°", "-110°", "-120°", "-130°", "-140°", "-150°", "-160°", "-170°", "180°"
   ] as const;
 
-  let dataW = spin.freq.length
   let dataH = datasets.length;
   let data = []
+
+  const minFreq = spin.freq.find(f => f > 20) ?? spin.freq[0]
+  const maxFreq = spin.freq.find(f => f > 20000) ?? spin.freq[spin.freq.length - 1]
+  let dataW = spin.freq.filter(f => f >= minFreq && f <= maxFreq).length
   for (let name of datasets) {
     for (let freq of spin.freq) {
+      if (freq < minFreq || freq > maxFreq) {
+        continue
+      }
       let v = spin.datasets[name].get(freq) ?? 0;
       data.push(Math.max(v, -30))
     }
@@ -267,7 +273,7 @@ export function renderContour(svg: SVGSVGElement, spin: SpinoramaData<Spin>) {
   const { graph, width, height } = prepareGraph(svg, color(-30))
 
   /* x & y scales */
-  const x = d3.scaleLog([20, 20000], [marginLeft, width - marginRight])
+  const x = d3.scaleLog([minFreq, maxFreq], [marginLeft, width - marginRight])
   const y = d3.scaleLinear([-180, 180], [height - marginBottom, marginTop])
 
   const path = d3.geoPath()
