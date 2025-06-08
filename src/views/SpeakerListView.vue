@@ -1,6 +1,6 @@
 <script setup lang="ts">
 
-import { metadata } from '@/util/spinorama';
+import { metadata } from '@/util/loaders';
 import { onUnmounted, ref, watchEffect, type Ref } from 'vue';
 
 /**
@@ -91,10 +91,10 @@ watchEffect(() => {
 
 <template>
   <div class="grid grid-cols-[max-content_1fr] grid-rows-[max-content_1fr] max-h-lvh">
-    <h1 class="font-bold self-center py-4 px-8">Unofficial spinorama<br/>(experimental version)</h1>
+    <h1 class="font-bold self-center p-4">Unofficial spinorama<br/>(experimental version)</h1>
 
-    <div class="grid self-center">
-      <input type="text" v-model="search" placeholder="Brand or model..."/>
+    <div class="grid self-center p-4">
+      <input type="text" class="border p-2" v-model="search" placeholder="Brand or model..."/>
     </div>
 
     <div class="bg-spinorama-bg-darker col-span-2 grid gap-4 overflow-y-scroll p-4 justify-center border-t auto-fit-cols">

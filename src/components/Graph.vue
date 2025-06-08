@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="T extends { [key: string]: Map<number, number> }">
 
 import type { Domain, GraphType } from '@/util/graphs';
-import type { SpinoramaData } from '@/util/spinorama';
+import type { SpinoramaData } from '@/util/loaders';
 import { onMounted, onUnmounted, ref, useTemplateRef, watchEffect } from 'vue';
 
 const svg = useTemplateRef("svg")

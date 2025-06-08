@@ -2,6 +2,7 @@ import { Complex } from "complex.js";
 
 const ZERO = new Complex(0);
 const ONE = new Complex(1);
+
 class Biquad {
     private a1 = ZERO
     private a2 = ZERO

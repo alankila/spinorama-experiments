@@ -1,5 +1,5 @@
-import { parse } from "papaparse";
-import { type Spin } from "./cea2034";
+import { parse as loaders } from "papaparse";
+import { spinKeys, type Spin } from "./cea2034";
 import _metadata from "@/metadata.json"
 import type { Biquads } from "./iir";
 import { iter } from "but-unzip";
@@ -11,11 +11,7 @@ export interface SpinoramaData<T> {
   datasets: T
 }
 
-export const spinKeys = [
-    "On-Axis", "180°",  "10°", "170°", "-170°", "-10°",  "20°", "160°", "-160°", "-20°",  "30°", "150°", "-150°", "-30°",  "40°", "140°", "-140°", "-40°",  "50°", "130°", "-130°", "-50°",  "60°", "120°", "-120°", "-60°",  "70°", "110°", "-110°", "-70°",  "80°", "100°", "-100°", "-80°",  "90°", "-90°"
-] as const;
-
-/* Placeholder that shows a flat line */
+/* Placeholder horizontal and vertical spin that shows a flat line */
 export const emptySpinorama: SpinoramaData<Spin> = {
   freq: [20, 20000],
   // @ts-ignore the required Spin types are indeed missing here, but they get filled right below!
@@ -62,7 +58,6 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
 
   let spins: SpinoramaData<Spin>[];
 
-  /* Klippel format -- this is among the most convenient for us */
   if ("SPL Horizontal.txt" in files && "SPL Vertical.txt" in files) {
     const horizSpin = readKlippel(files["SPL Horizontal.txt"])
     const vertSpin = readKlippel(files["SPL Vertical.txt"])
@@ -95,8 +90,8 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
       }
     }
 
-    /* Normalize to 0 dB level (FIXME: should we use common normalization factor for both spins?) */
-    setToMeanOnAxisLevel(spin)
+    /* Normalize to 0 dB level */
+    setToMeanOnAxisLevel(...spins)
   }
 
   if (JSON.stringify(spins[0].freq) !== JSON.stringify(spins[1].freq)) {
@@ -192,7 +187,7 @@ function readGllHvTxt(files: { [key: string]: string }) {
 }
 
 function readKlippel(csv: string) {
-  let data = parse<string[]>(csv, { delimiter: "\t" }).data
+  let data = loaders<string[]>(csv, { delimiter: "\t" }).data
   let _title = data.shift() ?? ""
   let datasets = data.shift() ?? []
   let _headers = data.shift() ?? []
@@ -249,25 +244,41 @@ function readKlippel(csv: string) {
 }
 
 /**
+ * Convert linear gain factor to dB
+ * 
+ * @param mag 
+ * @returns 
+ */
+function lin2db(mag: number) {
+  return mag > 0 ? Math.log(mag) / Math.log(10) * 20 : -144
+}
+
+/**
  * Normalize magnitudes so that On-Axis is 0 and all other measurements are also shifted relative to it.
+ * One measurement set involves a separate horizontal and vertical spin.
+ * We thus have two on-axis measurements, and we average them both.
  *
  * @param spin 
  */
-function setToMeanOnAxisLevel(spin: SpinoramaData<Spin>) {
-  let ds = spin.datasets["On-Axis"]
+function setToMeanOnAxisLevel(...spins: SpinoramaData<Spin>[]) {
+  let ds = spins.map(s => s.datasets["On-Axis"])
 
   let avg = 0;
   let count = 0;
-  for (let data of ds.entries()) {
-    if (data[0] >= 300 && data[0] <= 3000) {
-      avg += data[1]
-      count ++;
+  for (let s of ds.values()) {
+    for (let data of s.entries()) {
+      if (data[0] >= 300 && data[0] <= 3000) {
+        avg += data[1]
+        count ++;
+      }
     }
   }
-
   let mean = avg / count;
-  for (let data of Object.values(spin.datasets)) {
-    data.forEach((v, k) => data.set(k, v - mean))
+
+  for (let spin of spins) {
+    for (let data of Object.values(spin.datasets)) {
+      data.forEach((v, k) => data.set(k, v - mean))
+    }
   }
 }
 
@@ -284,8 +295,8 @@ export function iirAppliedSpin(spin: SpinoramaData<Spin>, biquads: Biquads) {
 
   let val = new Map<number, number>()
   for (let k of spin.freq) {
-    let xfer = biquads.transfer(k)
-    val.set(k, Math.log(xfer[0]) / Math.log(10) * 20)
+    let [mag, _ang] = biquads.transfer(k)
+    val.set(k, lin2db(mag))
   }
 
   for (let data of Object.values(spin.datasets)) {
@@ -299,16 +310,18 @@ export function iirAppliedSpin(spin: SpinoramaData<Spin>, biquads: Biquads) {
 }
 
 /**
- * Return "spins" of the IIR, in keys Overall, Filter 1, Filter 2, Filter 3, ...
+ * Return measurement set for IIR, in keys Overall, Filter 1, Filter 2, Filter 3, ...
  * 
  * @param freq 
  * @param biquads 
  */
 export function iirToSpin(freq: number[], biquads: Biquads) {
+  console.time("iir graph")
+
   let map = new Map<number, number>()
   for (let k of freq) {
-    let xfer = biquads.transfer(k)
-    map.set(k, Math.log(xfer[0]) / Math.log(10) * 20)
+    let [mag, _ang] = biquads.transfer(k)
+    map.set(k, lin2db(mag))
   }
 
   let spin: SpinoramaData<{ [key: string]: Map<number,number> }> = {
@@ -319,12 +332,13 @@ export function iirToSpin(freq: number[], biquads: Biquads) {
   for (let i = 0; i < biquads.biquadCount; i ++) {
     let map = new Map<number, number>()
     for (let k of freq) {
-      let xfer = biquads.applyBiquad(k, i)
-      map.set(k, Math.log(xfer[0]) / Math.log(10) * 20)
+      let [mag, _ang] = biquads.applyBiquad(k, i)
+      map.set(k, lin2db(mag))
     }
     spin.datasets[`Filter ${i+1}`] = map
   }
 
+  console.timeEnd("iir graph")
   return spin
 }
 
@@ -336,6 +350,7 @@ export function iirToSpin(freq: number[], biquads: Biquads) {
  */
 export function normalizedToOnAxis(spin: SpinoramaData<Spin>) {
   console.time("copy + normalize")
+
   spin = cloneSpinorama(spin)
 
   let onAxis = spin.datasets["On-Axis"]
@@ -345,8 +360,8 @@ export function normalizedToOnAxis(spin: SpinoramaData<Spin>) {
     }
     data.forEach((v, k) => data.set(k, v - (onAxis.get(k) ?? 0)))
   }
-
   onAxis.forEach((_, k) => onAxis.set(k, 0))
+
   console.timeEnd("copy + normalize")
   return spin
 }

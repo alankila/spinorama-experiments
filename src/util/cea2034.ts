@@ -2,7 +2,7 @@
  * Porting spinorama's CEA2034 computation here from Pierre Aubert
  */
 
-import type { SpinoramaData } from "./spinorama"
+import type { SpinoramaData } from "./loaders"
 
 export interface CEA2034 {
     "On-Axis": Map<number, number>,
@@ -103,6 +103,10 @@ export const sp_weigths = {
 
 export type Spin = { [K in keyof typeof sp_weigths]: Map<number, number> };
 
+export const spinKeys = [
+    "On-Axis", "180°",  "10°", "170°", "-170°", "-10°",  "20°", "160°", "-160°", "-20°",  "30°", "150°", "-150°", "-30°",  "40°", "140°", "-140°", "-40°",  "50°", "130°", "-130°", "-50°",  "60°", "120°", "-120°", "-60°",  "70°", "110°", "-110°", "-70°",  "80°", "100°", "-100°", "-80°",  "90°", "-90°"
+] as const;
+
 /** Convert SPL to pressure */
 function spl2pressure(spl: number) {
     return 10 ** ((spl - 105.0) / 20)
@@ -115,7 +119,6 @@ function pressure2spl(pressure: number) {
 
 /** 
  * Compute the spatial average of pressure with a function.
- * Provide list of dataset names to average and whether spatial weighting factors should be applied.
  */
 function spatial_average<T extends { [key: string]: Map<number, number> }>(spins: SpinoramaData<T>[], datasetFilter: (spin: SpinoramaData<T>, name: keyof T) => boolean, spatially_weighted: boolean) {
     const result = new Map<number, [number, number]>()
@@ -253,7 +256,6 @@ function early_reflections(horizSpin: SpinoramaData<Spin>, vertSpin: SpinoramaDa
 
 /**
  * Compute On Axis depending of which kind of data we have.
- * Likely best to average the horizontal and vertical measurements?
  */
 function compute_onaxis(horizSpin: SpinoramaData<Spin>, vertSpin: SpinoramaData<Spin>) {
     return spatial_average([horizSpin, vertSpin], (_, name) => name === "On-Axis", false)

@@ -1,7 +1,7 @@
 import * as d3 from "d3"
 // @ts-ignore no types for this
 import * as d3reg from "d3-regression"
-import { type SpinoramaData } from "./spinorama"
+import { type SpinoramaData } from "./loaders"
 import type { CEA2034, Spin } from "./cea2034"
 
 export const cea2034NonDi = ["On-Axis", "Listening Window", "Total Early Reflections", "Sound Power"] as const
@@ -68,11 +68,11 @@ export function renderFreqPlot<T extends { [key: string]: Map<number, number> }>
     /* regression is expecting just 1 dataset */
     for (let ds of datasets) {
       const predictor = d3reg.regressionLinear()
-      .x((d: number[]) => Math.log2(d[0]))
+      .x((d: number[]) => Math.log(d[0]))
       .y((d: number[]) => d[1])
       ([...spin.datasets[ds].entries()].filter(data => data[0] >= regression.min && data[0] <= regression.max));
 
-      let coords = line([[10, predictor.predict(Math.log2(10))], [40000, predictor.predict(Math.log2(40000))]]);
+      let coords = line([[10, predictor.predict(Math.log(10))], [40000, predictor.predict(Math.log(40000))]]);
 
       graph.append("path")
       .attr("clip-path", "url(#cut-graph)")
@@ -93,20 +93,24 @@ export function renderFreqPlot<T extends { [key: string]: Map<number, number> }>
       .attr("stroke-dasharray", "3,3")
       .attr("d", coords);
 
-      /* FIXME: these lines should be projected perpendicular to the regression normal. They could be slightly off if the line is very steep. */
+      /* Compute scaling factor to ensure lines are placed correctly apart.
+       * a is the line constant, but it has been computed for a logarithmic projection.
+       * The real part needs to be e^e to produce an angle in this case. */
+      const projectionToNormal = Math.cos(Math.atan2(predictor.a, Math.exp(Math.E)))
+      console.log("predictor", predictor.a, projectionToNormal)
       graph.append("path")
       .attr("clip-path", "url(#cut-graph)")
       .attr("stroke", "#484")
       .attr("stroke-width", "2")
       .attr("stroke-dasharray", "10,5")
-      .attr("d", line([[300, predictor.predict(Math.log2(300)) - 3], [5000, predictor.predict(Math.log2(5000)) - 3]]))
+      .attr("d", line([[300, predictor.predict(Math.log(300)) - 3/projectionToNormal], [5000, predictor.predict(Math.log(5000)) - 3/projectionToNormal]]))
 
       graph.append("path")
       .attr("clip-path", "url(#cut-graph)")
       .attr("stroke", "#484")
       .attr("stroke-width", "2")
       .attr("stroke-dasharray", "10,5")
-      .attr("d", line([[300, predictor.predict(Math.log2(300)) + 3], [5000, predictor.predict(Math.log2(5000)) + 3]]))
+      .attr("d", line([[300, predictor.predict(Math.log(300)) + 3/projectionToNormal], [5000, predictor.predict(Math.log(5000)) + 3/projectionToNormal]]))
     }
   }
 
