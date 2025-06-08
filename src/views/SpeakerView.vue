@@ -7,6 +7,7 @@ import { compute_cea2034 as computeCea2034, estimated_inroom as estimateInRoom }
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
 import { Biquads } from "@/util/iir";
 import Graph from "@/components/Graph.vue";
+import { getScores } from "@/util/scores";
 
 const { speakerId, measurementId } = defineProps<{ speakerId: keyof typeof metadata, measurementId: string }>();
 const router = useRouter();
@@ -76,6 +77,7 @@ const verticalContour = computed(() => {
 
 const cea2034 = computed(() => computeCea2034(horizontalContour.value, verticalContour.value))
 const pir = computed(() => estimateInRoom(cea2034.value))
+const scores = computed(() => getScores(cea2034.value))
 
 const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-Axis", "-10°", "-20°", "-30°", "-40°", "-50°", "-60°"] as const;
 
@@ -90,12 +92,12 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
         <span class="font-bold">Normalization options:</span>
         <label>
           <input type="checkbox" v-model="applyIir">
-          Use far-field equalization
+          Use recommended AutoEQ
         </label>
         <br/>
         <label>
           <input type="checkbox" v-model="showNormalized">
-          Force On-Axis to flat
+          Set On-Axis to flat
         </label>
       </div>
 
@@ -106,6 +108,16 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
         </select>
         <span v-else>{{ shownMeasurementId }}</span>
       </label>
+
+      <div class="grid grid-cols-[max-content_max-content_max-content_max-content] gap-x-2">
+        <div class="justify-self-end">Tonality (speaker only):</div><div class="font-bold">{{ scores.tonality.toFixed(2) }}</div>
+        <div class="justify-self-end">Tonality (with sub):</div><div class="font-bold">{{ scores.tonalityNoLfxLimit.toFixed(2) }}</div>
+
+        <div class="justify-self-end">On-Axis NBD:</div><div class="font-bold">{{ scores.nbdOnAxis.toFixed(3) }} dB</div>
+        <div class="justify-self-end">LFX:</div><div class="font-bold">{{ scores.lfxHz.toFixed(1) }} Hz</div>
+        <div class="justify-self-end">In-room NBD:</div><div class="font-bold">{{ scores.nbdPredInRoom.toFixed(3) }} dB</div>
+        <div class="justify-self-end">In-room SM:</div><div class="font-bold">{{ scores.smPredInRoom.toFixed(3) }}</div>
+      </div>
 
     </div>
 

@@ -6,7 +6,7 @@ import { iter } from "but-unzip";
 
 export const metadata = _metadata
 
-export interface SpinoramaData<T> {
+export interface SpinoramaData<T extends { [key: string]: Map<number, number> }> {
   freq: number[],
   datasets: T
 }

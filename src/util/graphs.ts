@@ -97,7 +97,6 @@ export function renderFreqPlot<T extends { [key: string]: Map<number, number> }>
        * a is the line constant, but it has been computed for a logarithmic projection.
        * The real part needs to be e^e to produce an angle in this case. */
       const projectionToNormal = Math.cos(Math.atan2(predictor.a, Math.exp(Math.E)))
-      console.log("predictor", predictor.a, projectionToNormal)
       graph.append("path")
       .attr("clip-path", "url(#cut-graph)")
       .attr("stroke", "#484")

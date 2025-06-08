@@ -4,7 +4,7 @@
 
 import type { SpinoramaData } from "./loaders"
 
-export interface CEA2034 {
+export type CEA2034 = {
     "On-Axis": Map<number, number>,
     "Listening Window": Map<number, number>,
     "Sound Power": Map<number, number>,
