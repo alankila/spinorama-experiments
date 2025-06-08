@@ -342,12 +342,6 @@ function readPrincetonOne(mat: Uint8Array) {
   const limitFreq = Math.min(20000, sampleRate / 2)
   const maxFreqIndex = Math.round(fftLength * limitFreq / sampleRate)
 
-  const freq: number[] = []
-  for (let i = 1; i < maxFreqIndex; i ++) {
-    /* Note: idx 1 ends at freq[0] */
-    freq.push(i * sampleRate / fftLength)
-  }
-
   // @ts-ignore
   const spin: Spin = {}
 
@@ -378,7 +372,7 @@ function readPrincetonOne(mat: Uint8Array) {
     let map = new Map<number, number>()
     for (let i = 1; i < maxFreqIndex; i ++) {
       const mag = (result[i][0] ** 2 + result[i][1] ** 2) ** 0.5
-      map.set(freq[i - 1], 105 + Math.log10(mag) * 20)
+      map.set(i / fftLength * sampleRate, 105 + Math.log10(mag) * 20)
     }
 
     spin[measurementName] = map

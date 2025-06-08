@@ -24,7 +24,13 @@ let iirSpin: SpinoramaData<{ [key: string]: Map<number, number> }> | undefined;
 try {
   const baseEq = router.resolve("/").href + `eq/${speakerId}/iir-autoeq.txt`;
   const iirRequest = await fetch(baseEq)
+  if (iirRequest.status != 200) {
+    throw new Error(` APO file status not 200: ${iirRequest.status} ${iirRequest.statusText}`)
+  }
   const apoConfig = await iirRequest.text()
+  if (apoConfig.startsWith("<")) {
+    throw new Error(`APO file is probably HTML: ${apoConfig}`)
+  }
   biquads = Biquads.fromApoConfig(apoConfig, 48000)
   let freq = 20
   let freqs: number[] = []
