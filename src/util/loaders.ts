@@ -1,8 +1,10 @@
 import { parse as loaders } from "papaparse";
 import { spinKeys, type Spin } from "./cea2034";
 import _metadata from "@/metadata.json"
-import type { Biquads } from "./iir";
 import { iter } from "but-unzip";
+import { lin2db, setToMeanOnAxisLevel } from "./spin-utils";
+// @ts-ignore
+import * as fftjs from "fft-js"
 
 export const metadata = _metadata
 
@@ -10,6 +12,8 @@ export interface SpinoramaData<T extends { [key: string]: Map<number, number> }>
   freq: number[],
   datasets: T
 }
+
+const utf8Decoder = new TextDecoder("utf-8")
 
 /* Placeholder horizontal and vertical spin that shows a flat line */
 export const emptySpinorama: SpinoramaData<Spin> = {
@@ -25,22 +29,12 @@ for (let k of spinKeys) {
   emptySpinorama.datasets[k] = map
 }
 
-function cloneSpinorama(data: SpinoramaData<Spin>): SpinoramaData<Spin> {
-  const datasets = { ...data.datasets }
-  spinKeys.forEach(k => datasets[k] = new Map(datasets[k]))
-  return {
-    freq: [...data.freq],
-    datasets,
-  }
-}
-
 async function unzip(data: Uint8Array) {
-  const txtFiles: { [key: string]: string } = {}
+  const txtFiles: { [key: string]: Uint8Array } = {}
 
   for (const entry of iter(data)) {
     const bytes = await entry.read();
-    const txtData = new TextDecoder("utf-8").decode(bytes)
-    txtFiles[entry.filename] = txtData.trimEnd()
+    txtFiles[entry.filename] = bytes;
   }
 
   return txtFiles
@@ -56,65 +50,63 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
   const binaryData = await graphResult.arrayBuffer()
   const files = await unzip(new Uint8Array(binaryData))
 
-  let spins: SpinoramaData<Spin>[];
+  let spins: Spin[];
 
   if ("SPL Horizontal.txt" in files && "SPL Vertical.txt" in files) {
-    const horizSpin = readKlippel(files["SPL Horizontal.txt"])
-    const vertSpin = readKlippel(files["SPL Vertical.txt"])
-    spins = [horizSpin, vertSpin]
+    spins = readKlippel(files);
   } else if (Object.keys(files).find(f => f.endsWith("_H 0.txt"))) {
     spins = readSplHvTxt(files)
   } else if (Object.keys(files).find(f => f.endsWith("-M0-P0.txt"))) {
     spins = readGllHvTxt(files)
+  } else if (Object.keys(files).find(f => f.endsWith("IR.mat"))) {
+    spins = readPrinceton(files)
   } else {
     throw new Error("Unknown file format");
   }
 
-  for (let spin of spins) {
-    spin.freq = [...spin.datasets["On-Axis"].keys()]
-    if (spin.freq.length < 20) {
-      throw new Error("Too few frequencies discovered!");
+  const spindatas = spins.map(spin => {
+    if (!spin["On-Axis"]) {
+      throw new Error(`Missing a dataset: On-Axis; found: ${Object.keys(spin)}`)
     }
 
-    /* Ensure frequencies appear in ascending order */
-    spin.freq.sort((a, b) => a - b)
+    const freq = [...spin["On-Axis"].keys()]
+    freq.sort((a, b) => a - b)
 
     for (let ds of spinKeys) {
-      if (!(ds in spin.datasets)) {
-        throw new Error(`Missing a dataset: ${ds}`)
+      if (!spin[ds]) {
+        throw new Error(`Missing a dataset: ${ds}; found: ${Object.keys(spin)}`)
       }
-      let freq = [...spin.datasets[ds].keys()];
-      freq.sort((a, b) => a - b)
-      if (JSON.stringify(freq) !== JSON.stringify(spin.freq)) {
+      let freq2 = [...spin[ds].keys()];
+      freq2.sort((a, b) => a - b)
+      if (JSON.stringify(freq) !== JSON.stringify(freq2)) {
         throw new Error(`Dataset frequencies are not same as in the spin in general on dataset: ${ds}`)
       }
     }
 
-    /* Normalize to 0 dB level */
-    setToMeanOnAxisLevel(...spins)
-  }
+    return {
+      freq,
+      datasets: spin,
+    }
+  })
 
-  if (JSON.stringify(spins[0].freq) !== JSON.stringify(spins[1].freq)) {
+  /* Normalize to 0 dB level */
+  setToMeanOnAxisLevel(...spindatas)
+
+  if (JSON.stringify(spindatas[0].freq) !== JSON.stringify(spindatas[1].freq)) {
     throw new Error(`Inconsistent use of frequencies across datasets`)
   }
 
-  console.log(spins[0].freq.length * spinKeys.length * 2, "datapoints loaded over", spins[0].freq.length, "frequencies covering range", spins[0].freq[0], "Hz -", spins[0].freq[spins[0].freq.length - 1], "Hz")
+  console.log(spindatas[0].freq.length * spinKeys.length * 2, "datapoints loaded over", spindatas[0].freq.length, "frequencies covering range", spindatas[0].freq[0], "Hz -", spindatas[0].freq[spindatas[0].freq.length - 1], "Hz")
 
   console.timeEnd("load")
-  return spins
+  return spindatas
 }
 
-function readSplHvTxt(files: { [key: string]: string }) {
-  let horizSpin: SpinoramaData<Spin> = {
-    freq: [],
-    // @ts-ignore
-    datasets: {},
-  }
-  let vertSpin: SpinoramaData<Spin> = {
-    freq: [],
-    // @ts-ignore
-    datasets: {},
-  }
+function readSplHvTxt(files: { [key: string]: Uint8Array }) {
+  // @ts-ignore
+  let horizSpin: Spin = {}
+  // @ts-ignore
+  let vertSpin: Spin = {}
   for (let dir of ["H", "V"]) {
     let spin = dir === "H" ? horizSpin : vertSpin
     for (let angle of spinKeys) {
@@ -126,34 +118,28 @@ function readSplHvTxt(files: { [key: string]: string }) {
       }
 
       let map = new Map()
-      for (let row of data[1].split(/\s*\n/)) {
-        if (row.startsWith("Freq")) {
+      for (let row of utf8Decoder.decode(data[1]).split(/\s*\n/)) {
+        if (!row || row.startsWith("Freq")) {
           continue
         }
         let [freq, mag, _pha] = row.split(/\s+/).map(v => parseFloat(v))
         if (!freq) {
-          throw new Error(`Unable to process row ${row}`)
+          throw new Error(`Unable to process row: ${row}`)
         }
         map.set(freq, mag)
       }
-      spin.datasets[angle] = map
+      spin[angle] = map
     }
   }
 
   return [horizSpin, vertSpin]
 }
 
-function readGllHvTxt(files: { [key: string]: string }) {
-  let horizSpin: SpinoramaData<Spin> = {
-    freq: [],
-    // @ts-ignore
-    datasets: {},
-  }
-  let vertSpin: SpinoramaData<Spin> = {
-    freq: [],
-    // @ts-ignore
-    datasets: {},
-  }
+function readGllHvTxt(files: { [key: string]: Uint8Array }) {
+  // @ts-ignore
+  let horizSpin: Spin = {}
+  // @ts-ignore
+  let vertSpin: Spin = {}
   for (let dir of ["H", "V"]) {
     let spin = dir === "H" ? horizSpin : vertSpin
     for (let angle of spinKeys) {
@@ -169,7 +155,7 @@ function readGllHvTxt(files: { [key: string]: string }) {
       }
 
       let map = new Map()
-      for (let row of data[1].split(/\s*\n/)) {
+      for (let row of utf8Decoder.decode(data[1]).split(/\s*\n/)) {
         if (!row || row.startsWith("Freq") || row.startsWith("Data") || row.startsWith("Display")) {
           continue
         }
@@ -179,14 +165,18 @@ function readGllHvTxt(files: { [key: string]: string }) {
         }
         map.set(freq, mag)
       }
-      spin.datasets[angle] = map
+      spin[angle] = map
     }
   }
 
   return [horizSpin, vertSpin]
 }
 
-function readKlippel(csv: string) {
+function readKlippel(files: { [name: string]: Uint8Array }) {
+  return [readKlippelOne(utf8Decoder.decode(files["SPL Horizontal.txt"])), readKlippelOne(utf8Decoder.decode(files["SPL Vertical.txt"]))]
+}
+
+function readKlippelOne(csv: string) {
   let data = loaders<string[]>(csv, { delimiter: "\t" }).data
   let _title = data.shift() ?? ""
   let datasets = data.shift() ?? []
@@ -202,13 +192,10 @@ function readKlippel(csv: string) {
    * Data rows are formatted in U.S. numeric format with thousands separator,
    * e.g. 1,234.56. We assume data can be interpreted as (Hz, SPL) pairs, for each 10 degree angle.
    */
-  const output: SpinoramaData<Spin> = {
-    freq: [],
-    // @ts-ignore filling in datasets below
-    datasets: {},
-  }
+  // @ts-ignore
+  const output: Spin = {}
   for (let ds of spinKeys) {
-    output.datasets[ds] = new Map();
+    output[ds] = new Map();
   }
 
   for (let i = 0; i < datasets.length; i += 2) {
@@ -216,8 +203,7 @@ function readKlippel(csv: string) {
       throw new Error(`Unexpected dataset name at index ${i+1}`);
     }
 
-    /* Note: this assertion is hypothetical; we validate it now. */
-    let d = datasets[i] as keyof Spin;
+    let d = <keyof Spin>datasets[i]
     if (spinKeys.indexOf(d) === -1) {
       throw new Error(`Unsupported dataset: ${d}`)
     }
@@ -228,12 +214,15 @@ function readKlippel(csv: string) {
   for (let row of data) {
     let freq = parseFloat(row[0].replace(",", ""))
     for (let i = 0; i < row.length; i += 2) {
+      if (!row[0]) {
+        continue
+      }
       if (freq !== parseFloat(row[i].replace(",", ""))) {
         throw new Error(`Inconsistent frequency data: ${freq} vs ${row[i]}`)
       }
 
       // @ts-ignore this has been proven to be valid before
-      let map = output.datasets[datasets[i]];
+      let map = output[datasets[i]];
       map.set(freq, parseFloat(row[i + 1].replace(",", "")))
     }
 
@@ -243,125 +232,204 @@ function readKlippel(csv: string) {
   return output
 }
 
-/**
- * Convert linear gain factor to dB
- * 
- * @param mag 
- * @returns 
- */
-function lin2db(mag: number) {
-  return mag > 0 ? Math.log(mag) / Math.log(10) * 20 : -144
-}
+function readPrinceton(files: { [key: string]: Uint8Array }) {
+  const hIr = Object.entries(files).filter(f => f[0].endsWith("_H_IR.mat")).map(f => f[1])[0]
+  const vIr = Object.entries(files).filter(f => f[0].endsWith("_V_IR.mat")).map(f => f[1])[0]
+  if (!hIr || !vIr) {
+    throw new Error("Unable to find both _H_IR.mat and _V_IR.mat files")
+  }
 
-/**
- * Normalize magnitudes so that On-Axis is 0 and all other measurements are also shifted relative to it.
- * One measurement set involves a separate horizontal and vertical spin.
- * We thus have two on-axis measurements, and we average them both.
- *
- * @param spin 
- */
-function setToMeanOnAxisLevel(...spins: SpinoramaData<Spin>[]) {
-  let ds = spins.map(s => s.datasets["On-Axis"])
+  const spins = [readPrincetonOne(hIr), readPrincetonOne(vIr)]
 
-  let avg = 0;
-  let count = 0;
-  for (let s of ds.values()) {
-    for (let data of s.entries()) {
-      if (data[0] >= 300 && data[0] <= 3000) {
-        avg += data[1]
-        count ++;
+  /* Some speakers are spherically symmetric, in which case they only measure it along in one axis. Quick hack to make that case work is to copy the spin. */
+  if (!Object.keys(spins[0]).length) {
+    // @ts-ignore
+    spins[0] = Object.fromEntries(Object.entries(spins[1]).map(kv => [kv[0], new Map(kv[1])]))
+  } else if (!Object.keys(spins[1]).length) {
+    // @ts-ignore
+    spins[1] = Object.fromEntries(Object.entries(spins[0]).map(kv => [kv[0], new Map(kv[1])]))
+  }
+
+  /* Repair one problem type: often, horizontal measurements are for one side only. Mirrored. */
+  for (let spin of spins) {
+    for (let ds of spinKeys) {
+      if (ds === "On-Axis" || ds === "180°") {
+        continue
+      }
+
+      // @ts-ignore
+      const invDs: keyof Spin = ds.startsWith("-") ? ds.substring(1) : "-" + ds
+      if (!spin[ds] && spin[invDs]) {
+        spin[ds] = new Map(spin[invDs])
       }
     }
   }
-  let mean = avg / count;
 
-  for (let spin of spins) {
-    for (let data of Object.values(spin.datasets)) {
-      data.forEach((v, k) => data.set(k, v - mean))
+  return spins
+}
+
+type MatTypes = Float64Array | Float32Array | Int32Array | Int16Array | Uint16Array | Uint8Array
+
+function readPrincetonOne(mat: Uint8Array) {
+  const types = [Float64Array, Float32Array, Int32Array, Int16Array, Uint16Array, Uint8Array] as const;
+  const sizes = [8, 4, 4, 2, 2, 1] as const
+
+  let matrices: { [name: string]: {
+    mrows: number,
+    ncols: number,
+    array: MatTypes,
+  } } = {}
+
+  let i = 0;
+  while (i < mat.length) {
+    let type = readIntBE(mat, i)
+    let mrows = readIntBE(mat, i+4)
+    let ncols = readIntBE(mat, i+8)
+    let imagf = readIntBE(mat, i+12)
+    let namelen = readIntBE(mat, i+16)
+    i += 20
+
+    const endian = Math.floor(type / 1000) % 10
+    if (endian > 1) {
+      throw new Error(`Matlab V4 matrices MOPT = ${type}: should have M=0 or M=1`)
     }
-  }
-}
-
-/**
- * Return IIR filtered version of spinorama measurement, corresponding to equalized version of the measurement
- * 
- * @param spin 
- * @param biquads 
- * @returns spin with IIR applied
- */
-export function iirAppliedSpin(spin: SpinoramaData<Spin>, biquads: Biquads) {
-  console.time("copy + iir + normalize")
-  spin = cloneSpinorama(spin)
-
-  let val = new Map<number, number>()
-  for (let k of spin.freq) {
-    let [mag, _ang] = biquads.transfer(k)
-    val.set(k, lin2db(mag))
-  }
-
-  for (let data of Object.values(spin.datasets)) {
-    data.forEach((v, k) => data.set(k, v + (val.get(k) ?? 0)))
-  }
-
-  setToMeanOnAxisLevel(spin)
-
-  console.timeEnd("copy + iir + normalize")
-  return spin
-}
-
-/**
- * Return measurement set for IIR, in keys Overall, Filter 1, Filter 2, Filter 3, ...
- * 
- * @param freq 
- * @param biquads 
- */
-export function iirToSpin(freq: number[], biquads: Biquads) {
-  console.time("iir graph")
-
-  let map = new Map<number, number>()
-  for (let k of freq) {
-    let [mag, _ang] = biquads.transfer(k)
-    map.set(k, lin2db(mag))
-  }
-
-  let spin: SpinoramaData<{ [key: string]: Map<number,number> }> = {
-    freq: [...freq],
-    datasets: { Overall: map },
-  }
-
-  for (let i = 0; i < biquads.biquadCount; i ++) {
-    let map = new Map<number, number>()
-    for (let k of freq) {
-      let [mag, _ang] = biquads.applyBiquad(k, i)
-      map.set(k, lin2db(mag))
+    if ((Math.floor(type / 100) % 10) !== 0) {
+      throw new Error(`Matlab V4 matrices MOPT = ${type}: should have O=0`)
     }
-    spin.datasets[`Filter ${i+1}`] = map
+    const precision = Math.floor(type / 10) % 10
+    if (precision > 5) {
+      throw new Error(`Precision must be a number from 0 to 5: ${precision}`)
+    }
+    if ((type % 10) !== 0) {
+      throw new Error(`Matlab V4 matrices MOPT = ${type}: should have T=0`)
+    }
+    
+    if (!mrows || !ncols) {
+      throw new Error(`Matrix size has dimension 0: ${ncols}x${mrows}`)
+    }
+    if (imagf) {
+      throw new Error("Unexpected imaginary number data")
+    }
+    if (!namelen) {
+      throw new Error("Must have namelen")
+    }
+
+    let name = readText(mat, i, namelen)
+    i += namelen
+
+    const length = mrows * ncols * sizes[precision];
+    const array = new types[precision](endianToNative(mat.slice(i, i + length), sizes[precision], endian).buffer)
+    matrices[name.replace(/_[HV]$/, "")] = {
+      mrows,
+      ncols,
+      array
+    }
+    i += length
   }
 
-  console.timeEnd("iir graph")
-  return spin
-}
+  if (!matrices["fs"]) {
+    throw new Error(`Sampling rate not indicated in file ${Object.keys(matrices)}`)
+  }
+  const sampleRate = matrices["fs"].array[0]
 
-/**
- * Subtracts the series from On-Axis suite from all other measurements, then set On-Axis itself to 0
- * 
- * @param spin 
- * @returns new spin with relative levels to On-Axis measurement
- */
-export function normalizedToOnAxis(spin: SpinoramaData<Spin>) {
-  console.time("copy + normalize")
+  if (!matrices["IR"]) {
+    throw new Error(`Impulse Response data ${Object.keys(matrices)}`)
+  }
 
-  spin = cloneSpinorama(spin)
+  /* Number of measurements */
+  const measurements = matrices["IR"].mrows
+  const fftLength = matrices["IR"].ncols
+  const limitFreq = Math.min(20000, sampleRate / 2)
+  const maxFreqIndex = Math.round(fftLength * limitFreq / sampleRate)
 
-  let onAxis = spin.datasets["On-Axis"]
-  for (let data of Object.values(spin.datasets)) {
-    if (data === onAxis) {
+  const freq: number[] = []
+  for (let i = 1; i < maxFreqIndex; i ++) {
+    /* Note: idx 1 ends at freq[0] */
+    freq.push(i * sampleRate / fftLength)
+  }
+
+  // @ts-ignore
+  const spin: Spin = {}
+
+  console.log("File contains", measurements, "angles with resolution", fftLength)
+
+  for (let n = 0; n < measurements; n ++) {
+    let angle = Math.round(n * 360 / measurements)
+    if ((angle % 10) != 0) {
       continue
     }
-    data.forEach((v, k) => data.set(k, v - (onAxis.get(k) ?? 0)))
-  }
-  onAxis.forEach((_, k) => onAxis.set(k, 0))
+    if (angle > 180) {
+      angle -= 360
+    }
+    // @ts-ignore proven correct by logic above
+    const measurementName: keyof Spin = angle === 0 ? "On-Axis" : angle + "°"
 
-  console.timeEnd("copy + normalize")
+    const ir = matrices["IR"].array
+    let data: number[] = []
+    for (let m = 0; m < fftLength; m ++) {
+      data[m] = ir[n + m * measurements]
+    }
+    if (!data.find(x => x)) {
+      continue
+    }
+ 
+    const result = fftjs.fft(data);
+    
+    let map = new Map<number, number>()
+    for (let i = 1; i < maxFreqIndex; i ++) {
+      const mag = (result[i][0] ** 2 + result[i][1] ** 2) ** 0.5
+      map.set(freq[i - 1], 105 + Math.log10(mag) * 20)
+    }
+
+    spin[measurementName] = map
+  }
+
   return spin
+}
+
+function readIntBE(mat: Uint8Array, pos: number) {
+  if (pos < 0 || pos > mat.length - 4) {
+    throw new Error(`Read past end of file: ${pos}/${mat.length}`)
+  }
+  return (mat[pos] << 24) | (mat[pos+1] << 16) | (mat[pos+2] << 8) | (mat[pos+3])
+}
+
+function readText(mat: Uint8Array, pos: number, len: number)  {
+  if (pos < 0 || pos > mat.length - len) {
+    throw new Error(`Read past end of file: ${pos}/${mat.length}`)
+  }
+  return String.fromCodePoint(...mat.slice(pos, pos + len - 1)).replace("\x00", "")
+} 
+
+/**
+ * In-place endianness swap, done as needed
+ */
+function endianToNative(array: Uint8Array, elementSize: number, endian: number) {
+  const u8 = new Uint8Array(2)
+  const u16 = new Uint16Array(u8.buffer)
+  u16[0] = 1
+  const nativeEndian = u8[1] == 1 ? 1 : 0
+
+  if (endian == nativeEndian) {
+    return array
+  } else if (elementSize === 1) {
+    return array
+  } else if (elementSize == 2) {
+    for (let i = 0; i < array.length; i += 2) {
+      [array[i+1], array[i]] = [array[i], array[i+1]]
+    }
+    return array
+  } else if (elementSize == 4) {
+    for (let i = 0; i < array.length; i += 4) {
+      [array[i+3], array[i+2], array[i+1], array[i]] = [array[i], array[i+1], array[i+2], array[i+3]]
+    }
+    return array
+  } else if (elementSize == 8) {
+    for (let i = 0; i < array.length; i += 8) {
+      [array[i+7], array[i+6], array[i+5], array[i+4], array[i+3], array[i+2], array[i+1], array[i]] = [array[i], array[i+1], array[i+2], array[i+3], array[i+4], array[i+5], array[i+6], array[i+7]]
+    }
+    return array
+  } else {
+    throw new Error(`Endian swap doesn't recognize element size ${elementSize}`)
+  }
 }

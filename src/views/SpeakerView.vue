@@ -1,13 +1,14 @@
 <script setup lang="ts">
 
 import { computed, ref, watchEffect } from "vue";
-import { readSpinoramaData, normalizedToOnAxis, emptySpinorama, metadata, iirAppliedSpin, iirToSpin, type SpinoramaData } from "@/util/loaders";
+import { readSpinoramaData, emptySpinorama, metadata, type SpinoramaData } from "@/util/loaders";
 import { useRouter } from "vue-router";
 import { compute_cea2034 as computeCea2034, estimated_inroom as estimateInRoom } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
 import { Biquads } from "@/util/iir";
 import Graph from "@/components/Graph.vue";
 import { getScores } from "@/util/scores";
+import { iirAppliedSpin, iirToSpin, normalizedToOnAxis } from "@/util/spin-utils";
 
 const { speakerId, measurementId } = defineProps<{ speakerId: keyof typeof metadata, measurementId: string }>();
 const router = useRouter();
@@ -15,8 +16,8 @@ const router = useRouter();
 const applyIir = ref(false);
 const showNormalized = ref(false);
 
-const shownMeasurementId = ref(measurementId)
 const measurements = Object.keys(metadata[speakerId].measurements)
+const shownMeasurementId = ref(measurementId)
 
 let biquads: Biquads | undefined
 let iirSpin: SpinoramaData<{ [key: string]: Map<number, number> }> | undefined;
@@ -42,14 +43,14 @@ let horizSpin = ref(emptySpinorama);
 let vertSpin = ref(emptySpinorama);
 watchEffect(async () => {
   const measurementId = shownMeasurementId.value
+  const baseMeasurement = router.resolve("/").href + `measurements/${speakerId}/${measurementId}.zip`
 
   try {
-    const baseMeasurement = router.resolve("/").href + `measurements/${speakerId}/${measurementId}.zip`;
     [horizSpin.value, vertSpin.value] = await readSpinoramaData(baseMeasurement)
   }
   catch (error) {
     console.log(error);
-    alert(`Error loading ${speakerId}/${measurementId} data: ` + error);
+    alert(`Error loading ${speakerId}/${measurementId} data: ` + error)
   }
 })
 
@@ -57,9 +58,9 @@ watchEffect(async () => {
 /* Not affected by eq, so cached as-is */
 const horizontalContour = computed(() => {
   if (showNormalized.value) {
-    return normalizedToOnAxis(horizSpin.value);
+    return normalizedToOnAxis(horizSpin.value)
   } else if (biquads && applyIir.value) {
-    return iirAppliedSpin(horizSpin.value, biquads);
+    return iirAppliedSpin(horizSpin.value, biquads)
   } else {
     return horizSpin.value;
   }
@@ -67,9 +68,9 @@ const horizontalContour = computed(() => {
 
 const verticalContour = computed(() => {
   if (showNormalized.value) {
-    return normalizedToOnAxis(vertSpin.value);
+    return normalizedToOnAxis(vertSpin.value)
   } else if (biquads && applyIir.value) {
-    return iirAppliedSpin(vertSpin.value, biquads);
+    return iirAppliedSpin(vertSpin.value, biquads)
   } else {
     return vertSpin.value;
   }

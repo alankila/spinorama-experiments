@@ -113,7 +113,7 @@ watchEffect(() => {
           <RouterLink :to="`view/${encodeURI(speakerId)}/${encodeURI(speaker.default_measurement)}`">
             {{ speaker.default_measurement }}
           </RouterLink>
-          <span :class="['klippel', 'spl_hv_txt', 'gll_hv_txt'].indexOf(format(speaker)) !== -1 ? 'text-green-700' : 'text-red-700'"> ({{ format(speaker) }})</span>
+          <span :class="['klippel', 'spl_hv_txt', 'gll_hv_txt', 'princeton'].indexOf(format(speaker)) !== -1 ? 'text-green-700' : 'text-red-700'"> ({{ format(speaker) }})</span>
         </div>
       </div>
     </div>
