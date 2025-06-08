@@ -49,7 +49,7 @@ watchEffect(async () => {
   }
   catch (error) {
     console.log(error);
-    alert(`The file format for ${speakerId}/${measurementId} is not yet supported: ` + error);
+    alert(`Error loading ${speakerId}/${measurementId} data: ` + error);
   }
 })
 
@@ -89,7 +89,7 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
 
     <div class="grid grid-flow-col auto-cols-max items-start gap-8 p-4">
       <div class="grid">
-        <span class="font-bold">Normalization options:</span>
+        <span class="font-bold">Equalization options:</span>
         <label>
           <input type="checkbox" v-model="applyIir">
           Use recommended AutoEQ
