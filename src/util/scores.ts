@@ -40,7 +40,6 @@ function octave(count: number) {
 
     let center = []
     for (let i = -o_iter; i <= o_iter; i ++) {
-        let ref 
         center.push(reference * Math.pow(p, i))
     }
 

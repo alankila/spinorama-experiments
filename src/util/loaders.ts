@@ -339,8 +339,9 @@ function readPrincetonOne(mat: Uint8Array) {
   /* Number of measurements */
   const measurements = matrices["IR"].mrows
   const fftLength = matrices["IR"].ncols
-  const limitFreq = Math.min(20000, sampleRate / 2)
-  const maxFreqIndex = Math.round(fftLength * limitFreq / sampleRate)
+  /* Sample the FFT for 24 points per octave. */
+  const density = 2 ** (1/24)
+  const sqrtDensity = density ** 0.5
 
   // @ts-ignore
   const spin: Spin = {}
@@ -370,11 +371,59 @@ function readPrincetonOne(mat: Uint8Array) {
     const result = fftjs.fft(data);
     
     let map = new Map<number, number>()
-    for (let i = 1; i < maxFreqIndex; i ++) {
-      const mag = (result[i][0] ** 2 + result[i][1] ** 2) ** 0.5
-      map.set(i / fftLength * sampleRate, 105 + Math.log10(mag) * 20)
-    }
+    let fftIdx = 0
+    for (let freq = 20; freq < Math.min(20000, sampleRate / 2); freq = freq * density) {
+      /* Figure out which bins to average in the calculation.
+       * We are guaranteed to have at least 1 thanks to <= */
 
+      const minIdx = fftLength * freq / sqrtDensity / sampleRate
+      const maxIdx = fftLength * freq * sqrtDensity / sampleRate
+
+      let mag = 0;
+      let count = 0
+      /* Resample FFT bins to reduce resolution. What I am doing here is computing the integral of linear interpolation of the FFT.
+       * I take advantage of the property of linear interpolation, where middle point between two ends * span is the correct value of the integral. */
+      let j = minIdx;
+      while (j < maxIdx) {
+        const idx = Math.floor(j)
+        const a = (result[idx][0] ** 2 + result[idx][1] ** 2) ** 0.5
+        const b = (result[idx + 1][0] ** 2 + result[idx + 1][1] ** 2) ** 0.5
+
+        /* Special case: we have a tiny sub-bin sample, both belong to interval [idx, idx+1]. Output is the average. */
+        if (idx < minIdx && idx + 1 > maxIdx) {
+          const p = (minIdx + maxIdx) / 2
+          const fraction = p - Math.floor(p)
+          /* technically, this interval should be weighted by maxIdx - minIdx, but since this will be the only sample, we don't care. */
+          mag = a * (1 - fraction) + b * fraction
+          count = 1
+          break
+        } else if (idx < minIdx) {
+          /* start of range; integral is the midpoint value between minIdx and idx + 1 with that span */
+          const p = (minIdx + (idx + 1)) / 2
+          const fraction = p - Math.floor(p)
+          const w = idx + 1 - minIdx
+          mag += (a * (1 - fraction) + b * fraction) * w
+          count += w
+          j = idx + 1
+        } else if (idx + 1 > maxIdx) {
+          /* end of range; integral is the midpoint value between idx and maxIdx with that span */
+          const p = (idx + maxIdx) / 2
+          const fraction = p - Math.floor(p)
+          const w = maxIdx - idx
+          mag += (a * (1 - fraction) + b * fraction) * w
+          count += w
+          j = maxIdx
+        } else {
+          /* Most common case where integral continues to further points. Value is taken at midpoint between idx and idx + 1 */
+          mag += (a + b) / 2
+          count += 1
+          j = idx + 1
+        }
+      }
+      mag /= count
+
+      map.set(freq, 105 + Math.log10(mag) * 20)
+    }
     spin[measurementName] = map
   }
 
