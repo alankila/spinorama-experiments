@@ -10,8 +10,19 @@ import type { SpinoramaData } from "./loaders";
  * @returns 
  */
 export function lin2db(mag: number) {
-  return mag > 0 ? Math.log(mag) / Math.log(10) * 20 : -144
+  return mag > 0 ? Math.log10(mag) * 20 : -144
 }
+
+/** Convert SPL to pressure */
+export function spl2pressure(spl: number) {
+    return 10 ** ((spl - 105.0) / 20)
+}
+
+/** Convert pressure to SPL */
+export function pressure2spl(pressure: number) {
+    return 105.0 + 20.0 * Math.log10(pressure);
+}
+
 
 /**
  * Normalize magnitudes so that On-Axis is 0 and all other measurements are also shifted relative to it.
@@ -42,10 +53,9 @@ export function setToMeanOnAxisLevel(...spins: SpinoramaData<Spin>[]) {
   }
 }
 
-
-function cloneSpinorama(data: SpinoramaData<Spin>): SpinoramaData<Spin> {
+export function cloneSpinorama(data: SpinoramaData<Spin>): SpinoramaData<Spin> {
   const datasets = { ...data.datasets }
-  spinKeys.forEach(k => datasets[k] = new Map(datasets[k]))
+  spinKeys.filter(k => datasets[k]).forEach(k => datasets[k] = new Map(datasets[k]))
   return {
     freq: [...data.freq],
     datasets,

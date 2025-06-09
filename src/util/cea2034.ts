@@ -3,6 +3,7 @@
  */
 
 import type { SpinoramaData } from "./loaders"
+import { pressure2spl, spl2pressure } from "./spin-utils"
 
 export type CEA2034 = {
     "On-Axis": Map<number, number>,
@@ -106,16 +107,6 @@ export type Spin = { [K in keyof typeof sp_weigths]: Map<number, number> };
 export const spinKeys = [
     "On-Axis", "180°",  "10°", "170°", "-170°", "-10°",  "20°", "160°", "-160°", "-20°",  "30°", "150°", "-150°", "-30°",  "40°", "140°", "-140°", "-40°",  "50°", "130°", "-130°", "-50°",  "60°", "120°", "-120°", "-60°",  "70°", "110°", "-110°", "-70°",  "80°", "100°", "-100°", "-80°",  "90°", "-90°"
 ] as const;
-
-/** Convert SPL to pressure */
-function spl2pressure(spl: number) {
-    return 10 ** ((spl - 105.0) / 20)
-}
-
-/** Convert pressure to SPL */
-function pressure2spl(pressure: number) {
-    return 105.0 + 20.0 * Math.log10(pressure);
-}
 
 /** 
  * Compute the spatial average of pressure with a function.

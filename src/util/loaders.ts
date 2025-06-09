@@ -2,7 +2,7 @@ import { parse as loaders } from "papaparse";
 import { spinKeys, type Spin } from "./cea2034";
 import _metadata from "@/metadata.json"
 import { iter } from "but-unzip";
-import { lin2db, setToMeanOnAxisLevel } from "./spin-utils";
+import { cloneSpinorama, lin2db, pressure2spl, setToMeanOnAxisLevel } from "./spin-utils";
 // @ts-ignore
 import * as fftjs from "fft-js"
 
@@ -241,16 +241,14 @@ function readPrinceton(files: { [key: string]: Uint8Array }) {
 
   const spins = [readPrincetonOne(hIr), readPrincetonOne(vIr)]
 
-  /* Some speakers are spherically symmetric, in which case they only measure it along in one axis. Quick hack to make that case work is to copy the spin. */
+  /* If measurement data for other spin is missing, copy the other spin */
   if (!Object.keys(spins[0]).length) {
-    // @ts-ignore
-    spins[0] = Object.fromEntries(Object.entries(spins[1]).map(kv => [kv[0], new Map(kv[1])]))
+    spins[0] = cloneSpinorama({ freq: [], datasets: spins[1]}).datasets
   } else if (!Object.keys(spins[1]).length) {
-    // @ts-ignore
-    spins[1] = Object.fromEntries(Object.entries(spins[0]).map(kv => [kv[0], new Map(kv[1])]))
+    spins[1] = cloneSpinorama({ freq: [], datasets: spins[0]}).datasets
   }
 
-  /* Repair one problem type: often, horizontal measurements are for one side only. Mirrored. */
+  /* Mirror any missing measurements from other side of the spin */
   for (let spin of spins) {
     for (let ds of spinKeys) {
       if (ds === "On-Axis" || ds === "180°") {
@@ -261,6 +259,25 @@ function readPrinceton(files: { [key: string]: Uint8Array }) {
       const invDs: keyof Spin = ds.startsWith("-") ? ds.substring(1) : "-" + ds
       if (!spin[ds] && spin[invDs]) {
         spin[ds] = new Map(spin[invDs])
+      }
+    }
+  }
+
+  /* If the files don't provide the > 90 degree angles, we copy the 90 degrees measurement. (Sigh.) */
+  const posAngles = ["180°", "170°", "160°", "150°", "140°", "130°", "120°", "110°", "100°"] as const
+  const negAngles = ["-170°", "-160°", "-150°", "-140°", "-130°", "-120°", "-110°", "-100°"] as const
+  for (let spin of spins) {
+    if (spin["90°"] && !posAngles.map(ds => spin[ds]).find(x => x)) {
+      for (let ds of posAngles) {
+        spin[ds] = new Map(spin["90°"])
+      }
+    }
+    if (spin["-90°"] && !negAngles.map(ds => spin[ds]).find(x => x)) {
+      for (let ds of negAngles) {
+        spin[ds] = new Map(spin["-90°"])
+      }
+      if (!spin["180°"]) {
+        spin["180°"] = new Map(spin["-90°"])
       }
     }
   }
@@ -395,7 +412,7 @@ function readPrincetonOne(mat: Uint8Array) {
       /* The weight sum is maxIdx - minIdx by construction */
       mag /= maxIdx - minIdx
 
-      map.set(freq, 105 + Math.log10(mag) * 20)
+      map.set(freq, pressure2spl(mag))
     }
     spin[measurementName] = map
   }

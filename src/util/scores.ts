@@ -10,6 +10,12 @@ interface Scores {
     tonalityNoLfxLimit: number,
 }
 
+const NBD_MIN_HZ = 100 /* NBD functions start at 100 Hz even if measurement covers below */
+const NBD_MAX_HZ = 12000 /* NBD functions end at 12000 Hz */
+const LFX_MIN_HZ = 14.5 /* considered to be "ideal subwoofer" */
+const SM_MIN_HZ = 100 /* Smoothness is evaluated from 100 Hz forwards */
+const SM_MAX_HZ = 16000 /* Smoothness is evaluated up to 16000 Hz */
+
 function mean(values: number[]) {
     let avg = 0
     for (let i = 0; i < values.length; i ++) {
@@ -58,7 +64,7 @@ export function getScores(cea2034: SpinoramaData<CEA2034>): Scores {
         nbdPredInRoom,
         smPredInRoom,
         tonality: 12.69 - 2.49 * nbdOnAxis - 2.99 * nbdPredInRoom - 4.31 * Math.log10(lfxHz) + 2.32 * smPredInRoom,
-        tonalityNoLfxLimit: 12.69 - 2.49 * nbdOnAxis - 2.99 * nbdPredInRoom - 4.31 * Math.log10(14.5) + 2.32 * smPredInRoom,
+        tonalityNoLfxLimit: 12.69 - 2.49 * nbdOnAxis - 2.99 * nbdPredInRoom - 4.31 * Math.log10(LFX_MIN_HZ) + 2.32 * smPredInRoom,
     }
 }
 
@@ -80,8 +86,8 @@ function computeLfxHz(cea2034: SpinoramaData<CEA2034>) {
         }
     }
 
-    /* Return the 1st frequency as the limit if we didn't hit such freq. */
-    return cea2034.freq[0]
+    /* Return the 1st frequency as the limit if we didn't hit such freq, or at least 14.5 so we don't overshoot our "ideal sub" figure if measurement ges below 14.5 Hz */
+    return Math.max(cea2034.freq[0], LFX_MIN_HZ)
 }
 
 /**
@@ -98,8 +104,8 @@ function computeLfxHz(cea2034: SpinoramaData<CEA2034>) {
  * 1/2-octave band is based a sample of 10 equally log-spaced data points.
  */
 function nbd<T extends { [key: string]: Map<number, number> }>(spin: SpinoramaData<T>, name: keyof T) {
-    const bandMinFreq = Math.max(100, spin.freq[0])
-    const bands = octave(2).filter(p => p[1] >= bandMinFreq && p[1] <= 12000).map(b => {
+    const bandMinFreq = Math.max(NBD_MIN_HZ, spin.freq[0])
+    const bands = octave(2).filter(p => p[1] >= bandMinFreq && p[1] <= NBD_MAX_HZ).map(b => {
         let avg = 0
         let count = 0
         let result: number[] = []
@@ -137,7 +143,7 @@ function nbd<T extends { [key: string]: Map<number, number> }>(spin: SpinoramaDa
  * smoother frequency response curves.
  */
 function sm<T extends { [key: string]: Map<number, number> }>(spin: SpinoramaData<T>, name: keyof T) {
-    const ds = [...spin.datasets[name]].filter(x => x[0] >= 100 && x[0] <= 16000).map(x => [Math.log(x[0]), x[1]]);
+    const ds = [...spin.datasets[name]].filter(x => x[0] >= SM_MIN_HZ && x[0] <= SM_MAX_HZ).map(x => [Math.log(x[0]), x[1]]);
 
     /*
      * https://en.wikipedia.org/wiki/Pearson_correlation_coefficient
