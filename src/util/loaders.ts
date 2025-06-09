@@ -360,7 +360,7 @@ function readPrincetonOne(mat: Uint8Array) {
     const measurementName: keyof Spin = angle === 0 ? "On-Axis" : angle + "°"
 
     const ir = matrices["IR"].array
-    let data: number[] = []
+    const data: number[] = []
     for (let m = 0; m < fftLength; m ++) {
       data[m] = ir[n + m * measurements]
     }
@@ -376,17 +376,19 @@ function readPrincetonOne(mat: Uint8Array) {
       const minIdx = fftLength * freq / sqrtDensity / sampleRate
       const maxIdx = fftLength * freq * sqrtDensity / sampleRate
 
-      /* Resample FFT bins to reduce resolution. What I am doing here is computing the integral of linear interpolation of the FFT.
-       * I take advantage of the property of linear interpolation, where middle point between two ends * width is the correct value of the integral. */
+      /* Resample FFT bins to reduce resolution. What I am doing here is computing the integral of linear interpolation of the FFT,
+       * which I then divide by its span to yield average.
+       * x axis integral for a line from (x1, y1) to (x2, y2) = (y2 + y1) / 2 * (x2 - x1) or the midpoint of y's times the x span.
+       */
       let mag = 0;
       for (let idx = Math.floor(minIdx); idx < maxIdx && idx + 1 < fftLength / 2; idx ++) {
         const a = (result[idx][0] ** 2 + result[idx][1] ** 2) ** 0.5
         const b = (result[idx + 1][0] ** 2 + result[idx + 1][1] ** 2) ** 0.5
 
         /* spanStart, spanEnd belong to [0, 1] and represent the region between a and b that is integrated */
-        const spanStart = idx < minIdx ? minIdx - Math.floor(minIdx) : 0
-        const spanEnd = idx + 1 > maxIdx ? maxIdx - Math.floor(maxIdx) : 1
-        const weight = spanEnd - spanStart
+        const spanStart = idx < minIdx ? minIdx - idx : 0
+        const spanEnd = idx + 1 > maxIdx ? maxIdx - idx : 1
+        const weight = spanEnd - spanStart /* This is 1 except near ends */
         const fraction = (spanEnd + spanStart) / 2
         mag += (a * (1 - fraction) + b * fraction) * weight
       }
