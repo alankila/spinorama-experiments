@@ -7,7 +7,7 @@ import { compute_cea2034 as computeCea2034, estimated_inroom as estimateInRoom }
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
 import { Biquads } from "@/util/iir";
 import Graph from "@/components/Graph.vue";
-import { getScores } from "@/util/scores";
+import { getScores, PIR_MIN_HZ, PIR_MAX_HZ } from "@/util/scores";
 import { iirAppliedSpin, iirToSpin, normalizedToOnAxis } from "@/util/spin-utils";
 
 const { speakerId, measurementId } = defineProps<{ speakerId: keyof typeof metadata, measurementId: string }>();
@@ -137,7 +137,7 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
       <div class="card">
         <h1>On axis</h1>
         <Graph :spin="cea2034" :render="renderFreqPlot" :datasets="['On-Axis']"
-          :regression="{ min: 100, max: 12000 }" />
+          :regression="{ min: PIR_MIN_HZ, max: PIR_MAX_HZ }" />
       </div>
 
       <div class="card">
@@ -149,7 +149,7 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
       <div class="card">
         <h1>Estimated In-Room Response</h1>
         <Graph :spin="pir" :render="renderFreqPlot" :datasets="['Estimated In-Room']"
-          :regression="{ min: 100, max: 12000 }" />
+          :regression="{ min: PIR_MIN_HZ, max: PIR_MAX_HZ }" />
       </div>
 
       <div class="card">

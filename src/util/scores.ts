@@ -8,6 +8,7 @@ export interface Scores {
     smPredInRoom: number,
     tonality: number,
     tonalityNoLfxLimit: number,
+    flatness: number,
     isBusted: boolean,
 }
 
@@ -16,6 +17,12 @@ const NBD_MAX_HZ = 12000 /* NBD functions end at 12000 Hz */
 const LFX_MIN_HZ = 14.5 /* considered to be "ideal subwoofer" */
 const SM_MIN_HZ = 100 /* Smoothness is evaluated from 100 Hz forwards */
 const SM_MAX_HZ = 16000 /* Smoothness is evaluated up to 16000 Hz */
+
+export const MIDRANGE_MIN = 300
+export const MIDRANGE_MAX = 5000
+
+export const PIR_MIN_HZ = 100
+export const PIR_MAX_HZ = 12000
 
 function mean(values: number[]) {
     let avg = 0
@@ -59,11 +66,15 @@ export function getScores(cea2034: SpinoramaData<CEA2034>): Scores {
     const nbdOnAxis = nbd(cea2034, "On-Axis")
     const nbdPredInRoom = nbd(pir, "Estimated In-Room")
     const smPredInRoom = sm(pir, "Estimated In-Room")
+    const midrangeMean = meanOverRange(cea2034, "On-Axis", MIDRANGE_MIN, MIDRANGE_MAX)
+    const flatness = [...cea2034.datasets["On-Axis"]].filter(p => p[0] >= MIDRANGE_MIN && p[0] <= MIDRANGE_MAX).map(p => Math.abs(p[1] - midrangeMean)).reduce((a, b) => a > b ? a : b, 0)
+
     return {
         lfxHz,
         nbdOnAxis,
         nbdPredInRoom,
         smPredInRoom,
+        flatness,
         tonality: 12.69 - 2.49 * nbdOnAxis - 2.99 * nbdPredInRoom - 4.31 * Math.log10(lfxHz) + 2.32 * smPredInRoom,
         tonalityNoLfxLimit: 12.69 - 2.49 * nbdOnAxis - 2.99 * nbdPredInRoom - 4.31 * Math.log10(LFX_MIN_HZ) + 2.32 * smPredInRoom,
         isBusted: cea2034.isBusted,

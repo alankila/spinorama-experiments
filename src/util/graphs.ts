@@ -3,6 +3,7 @@ import * as d3 from "d3"
 import * as d3reg from "d3-regression"
 import { type SpinoramaData } from "./loaders"
 import type { CEA2034, Spin } from "./cea2034"
+import { MIDRANGE_MAX, MIDRANGE_MIN } from "./scores"
 
 export const cea2034NonDi = ["On-Axis", "Listening Window", "Total Early Reflections", "Sound Power"] as const
 export const cea2034Di = ["Sound Power DI", "Early Reflections DI"] as const
@@ -102,14 +103,14 @@ export function renderFreqPlot<T extends { [key: string]: Map<number, number> }>
       .attr("stroke", "#484")
       .attr("stroke-width", "2")
       .attr("stroke-dasharray", "10,5")
-      .attr("d", line([[300, predictor.predict(Math.log(300)) - 3/projectionToNormal], [5000, predictor.predict(Math.log(5000)) - 3/projectionToNormal]]))
+      .attr("d", line([[MIDRANGE_MIN, predictor.predict(Math.log(MIDRANGE_MIN)) - 3/projectionToNormal], [MIDRANGE_MAX, predictor.predict(Math.log(MIDRANGE_MAX)) - 3/projectionToNormal]]))
 
       graph.append("path")
       .attr("clip-path", "url(#cut-graph)")
       .attr("stroke", "#484")
       .attr("stroke-width", "2")
       .attr("stroke-dasharray", "10,5")
-      .attr("d", line([[300, predictor.predict(Math.log(300)) + 3/projectionToNormal], [5000, predictor.predict(Math.log(5000)) + 3/projectionToNormal]]))
+      .attr("d", line([[MIDRANGE_MIN, predictor.predict(Math.log(MIDRANGE_MIN)) + 3/projectionToNormal], [MIDRANGE_MAX, predictor.predict(Math.log(MIDRANGE_MAX)) + 3/projectionToNormal]]))
     }
   }
 
