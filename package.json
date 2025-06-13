@@ -8,9 +8,11 @@
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "build-only": "vite build",
-    "type-check": "vue-tsc --build"
+    "type-check": "vue-tsc --build",
+    "generate-metadata": "tsx --tsconfig tsconfig.node.json --experimental-detect-module nodejs/generate-metadata.ts"
   },
   "dependencies": {
+    "tsx": "^4.20.3",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
   },
@@ -19,7 +21,6 @@
     "@tsconfig/node22": "^22.0.1",
     "@types/d3": "^7.4.3",
     "@types/node": "^22.14.0",
-    "@types/papaparse": "^5.3.16",
     "@vitejs/plugin-vue": "^5.2.3",
     "@vue/tsconfig": "^0.7.0",
     "assert": "^2.1.0",

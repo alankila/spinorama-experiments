@@ -1,10 +1,9 @@
-import { parse as loaders } from "papaparse";
 import { spinKeys, type Spin } from "./cea2034";
 import _metadata from "@/metadata.json"
 import { iter } from "but-unzip";
-import { cloneSpinorama, lin2db, pressure2spl, setToMeanOnAxisLevel } from "./spin-utils";
+import { cloneSpinorama, pressure2spl, setToMeanOnAxisLevel } from "./spin-utils";
 // @ts-ignore
-import * as fftjs from "fft-js"
+import fftjs from "fft-js"
 
 export const metadata = _metadata
 
@@ -48,21 +47,27 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
     throw new Error(`Unable to find data: ${url}: ${graphResult.status} ${graphResult.statusText}`)
   }
   const binaryData = await graphResult.arrayBuffer()
-  const files = await unzip(new Uint8Array(binaryData))
+  return processSpinoramaFile(new Uint8Array(binaryData))
+}
+
+export async function processSpinoramaFile(binaryData: Uint8Array) {
+  const files = await unzip(binaryData)
 
   let spins: Spin[];
 
   if ("SPL Horizontal.txt" in files && "SPL Vertical.txt" in files) {
     spins = readKlippel(files);
-  } else if (Object.keys(files).find(f => f.endsWith("_H 0.txt"))) {
+  } else if (Object.keys(files).find(f => f.endsWith("_H 0.txt") || f.endsWith("0_H.txt"))) {
     spins = readSplHvTxt(files)
   } else if (Object.keys(files).find(f => f.endsWith("-M0-P0.txt"))) {
     spins = readGllHvTxt(files)
   } else if (Object.keys(files).find(f => f.endsWith("IR.mat"))) {
     spins = readPrinceton(files)
   } else {
-    throw new Error("Unknown file format");
+    throw new Error(`Unknown file format: didn't recognize any files: ${Object.keys(files)}`);
   }
+
+  performHackyRepairs(spins);
 
   const spindatas = spins.map(spin => {
     if (!spin["On-Axis"]) {
@@ -96,9 +101,7 @@ export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin
     throw new Error(`Inconsistent use of frequencies across datasets`)
   }
 
-  console.log(spindatas[0].freq.length * spinKeys.length * 2, "datapoints loaded over", spindatas[0].freq.length, "frequencies covering range", spindatas[0].freq[0], "Hz -", spindatas[0].freq[spindatas[0].freq.length - 1], "Hz")
-
-  console.timeEnd("load")
+  //console.log(spindatas[0].freq.length * spinKeys.length * 2, "datapoints loaded over", spindatas[0].freq.length, "frequencies covering range", spindatas[0].freq[0], "Hz -", spindatas[0].freq[spindatas[0].freq.length - 1], "Hz")
   return spindatas
 }
 
@@ -110,11 +113,12 @@ function readSplHvTxt(files: { [key: string]: Uint8Array }) {
   for (let dir of ["H", "V"]) {
     let spin = dir === "H" ? horizSpin : vertSpin
     for (let angle of spinKeys) {
-      let name = ` _${dir} ${angle === 'On-Axis' ? 0 : angle.replace("°", "")}.txt`
+      let name1 = ` _${dir} ${angle === 'On-Axis' ? 0 : angle.replace("°", "")}.txt`
+      let name2 = `${angle === 'On-Axis' ? 0 : angle.replace("°", "")}_${dir}.txt`
       
-      let data = Object.entries(files).find(f => f[0].endsWith(name))
+      let data = Object.entries(files).find(f => f[0].endsWith(name1) || f[0].endsWith(name2))
       if (!data) {
-        throw new Error(`Was not able to find measurement angle ${name} in SPL HV data ${Object.keys(files)}`)
+        continue
       }
 
       let map = new Map()
@@ -177,7 +181,7 @@ function readKlippel(files: { [name: string]: Uint8Array }) {
 }
 
 function readKlippelOne(csv: string) {
-  let data = loaders<string[]>(csv, { delimiter: "\t" }).data
+  let data = csv.split(/\s*\n/).map(d => d.replace(/"/g, "").split("\t"))
   let _title = data.shift() ?? ""
   let datasets = data.shift() ?? []
   let _headers = data.shift() ?? []
@@ -232,15 +236,7 @@ function readKlippelOne(csv: string) {
   return output
 }
 
-function readPrinceton(files: { [key: string]: Uint8Array }) {
-  const hIr = Object.entries(files).filter(f => f[0].endsWith("_H_IR.mat")).map(f => f[1])[0]
-  const vIr = Object.entries(files).filter(f => f[0].endsWith("_V_IR.mat")).map(f => f[1])[0]
-  if (!hIr || !vIr) {
-    throw new Error("Unable to find both _H_IR.mat and _V_IR.mat files")
-  }
-
-  const spins = [readPrincetonOne(hIr), readPrincetonOne(vIr)]
-
+function performHackyRepairs(spins: Spin[]) {
   /* If measurement data for other spin is missing, copy the other spin */
   if (!Object.keys(spins[0]).length) {
     spins[0] = cloneSpinorama({ freq: [], datasets: spins[1]}).datasets
@@ -280,9 +276,17 @@ function readPrinceton(files: { [key: string]: Uint8Array }) {
         spin["180°"] = new Map(spin["-90°"])
       }
     }
+  }  
+}
+
+function readPrinceton(files: { [key: string]: Uint8Array }) {
+  const hIr = Object.entries(files).filter(f => f[0].endsWith("_H_IR.mat")).map(f => f[1])[0]
+  const vIr = Object.entries(files).filter(f => f[0].endsWith("_V_IR.mat")).map(f => f[1])[0]
+  if (!hIr || !vIr) {
+    throw new Error("Unable to find both _H_IR.mat and _V_IR.mat files")
   }
 
-  return spins
+  return [readPrincetonOne(hIr), readPrincetonOne(vIr)]
 }
 
 type MatTypes = Float64Array | Float32Array | Int32Array | Int16Array | Uint16Array | Uint8Array
@@ -335,7 +339,11 @@ function readPrincetonOne(mat: Uint8Array) {
     i += namelen
 
     const length = mrows * ncols * sizes[precision];
-    const array = new types[precision](endianToNative(mat.slice(i, i + length), sizes[precision], endian).buffer)
+    if (i + length > mat.length) {
+      throw new Error(`Matrix ${name} exceeds file bounds`);
+    }
+    const endianSwapped = endianToNative(mat, i, i + length, sizes[precision], endian)
+    const array = new types[precision](endianSwapped.buffer.slice(i, i + length))
     matrices[name.replace(/_[HV]$/, "")] = {
       mrows,
       ncols,
@@ -363,7 +371,7 @@ function readPrincetonOne(mat: Uint8Array) {
   // @ts-ignore
   const spin: Spin = {}
 
-  console.log("File contains", measurements, "angles with resolution", fftLength)
+  //console.log("File contains", measurements, "angles with resolution", fftLength)
 
   for (let n = 0; n < measurements; n ++) {
     let angle = Math.round(n * 360 / measurements)
@@ -377,15 +385,19 @@ function readPrincetonOne(mat: Uint8Array) {
     const measurementName: keyof Spin = angle === 0 ? "On-Axis" : angle + "°"
 
     const ir = matrices["IR"].array
-    const data: number[] = []
+    const data: number[] | number[][] = []
+    let anyNonZero = false
     for (let m = 0; m < fftLength; m ++) {
-      data[m] = ir[n + m * measurements]
+      const v = ir[n + m * measurements]
+      data[m] = v
+      anyNonZero ||= v != 0
     }
-    if (!data.find(x => x)) {
+    if (!anyNonZero) {
       continue
     }
- 
-    const result = fftjs.fft(data);
+
+    fftjs.fftInPlace(data);
+    const result = <number[][]>data
     
     let map = new Map<number, number>()
     for (let freq = 20; freq < 20000; freq = freq * density) {
@@ -437,32 +449,28 @@ function readText(mat: Uint8Array, pos: number, len: number)  {
 /**
  * In-place endianness swap, done as needed
  */
-function endianToNative(array: Uint8Array, elementSize: number, endian: number) {
+function endianToNative(array: Uint8Array, start: number, end: number, elementSize: number, endian: number) {
   const u8 = new Uint8Array(2)
   const u16 = new Uint16Array(u8.buffer)
   u16[0] = 1
   const nativeEndian = u8[1] == 1 ? 1 : 0
 
-  if (endian == nativeEndian) {
-    return array
-  } else if (elementSize === 1) {
-    return array
+  if (endian == nativeEndian || elementSize == 1) {
+    /* nothing to do */
   } else if (elementSize == 2) {
-    for (let i = 0; i < array.length; i += 2) {
+    for (let i = start; i < end; i += 2) {
       [array[i+1], array[i]] = [array[i], array[i+1]]
     }
-    return array
   } else if (elementSize == 4) {
-    for (let i = 0; i < array.length; i += 4) {
+    for (let i = start; i < end; i += 4) {
       [array[i+3], array[i+2], array[i+1], array[i]] = [array[i], array[i+1], array[i+2], array[i+3]]
     }
-    return array
   } else if (elementSize == 8) {
-    for (let i = 0; i < array.length; i += 8) {
+    for (let i = start; i < end; i += 8) {
       [array[i+7], array[i+6], array[i+5], array[i+4], array[i+3], array[i+2], array[i+1], array[i]] = [array[i], array[i+1], array[i+2], array[i+3], array[i+4], array[i+5], array[i+6], array[i+7]]
     }
-    return array
   } else {
     throw new Error(`Endian swap doesn't recognize element size ${elementSize}`)
   }
+  return array
 }
