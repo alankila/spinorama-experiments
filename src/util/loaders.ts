@@ -9,7 +9,8 @@ export const metadata = _metadata
 
 export interface SpinoramaData<T extends { [key: string]: Map<number, number> }> {
   freq: number[],
-  datasets: T
+  datasets: T,
+  isBusted: boolean,
 }
 
 const utf8Decoder = new TextDecoder("utf-8")
@@ -67,7 +68,7 @@ export async function processSpinoramaFile(binaryData: Uint8Array) {
     throw new Error(`Unknown file format: didn't recognize any files: ${Object.keys(files)}`);
   }
 
-  performHackyRepairs(spins);
+  const isBusted = performHackyRepairs(spins);
 
   const spindatas = spins.map(spin => {
     if (!spin["On-Axis"]) {
@@ -90,6 +91,7 @@ export async function processSpinoramaFile(binaryData: Uint8Array) {
 
     return {
       freq,
+      isBusted,
       datasets: spin,
     }
   })
@@ -237,11 +239,15 @@ function readKlippelOne(csv: string) {
 }
 
 function performHackyRepairs(spins: Spin[]) {
+  let isBusted = false
+
   /* If measurement data for other spin is missing, copy the other spin */
   if (!Object.keys(spins[0]).length) {
-    spins[0] = cloneSpinorama({ freq: [], datasets: spins[1]}).datasets
+    spins[0] = cloneSpinorama({ freq: [], datasets: spins[1], isBusted: true }).datasets
+    isBusted = true
   } else if (!Object.keys(spins[1]).length) {
-    spins[1] = cloneSpinorama({ freq: [], datasets: spins[0]}).datasets
+    spins[1] = cloneSpinorama({ freq: [], datasets: spins[0], isBusted: true, }).datasets
+    isBusted = true
   }
 
   /* Mirror any missing measurements from other side of the spin */
@@ -255,6 +261,7 @@ function performHackyRepairs(spins: Spin[]) {
       const invDs: keyof Spin = ds.startsWith("-") ? ds.substring(1) : "-" + ds
       if (!spin[ds] && spin[invDs]) {
         spin[ds] = new Map(spin[invDs])
+        isBusted = true
       }
     }
   }
@@ -267,6 +274,7 @@ function performHackyRepairs(spins: Spin[]) {
       for (let ds of posAngles) {
         spin[ds] = new Map(spin["90°"])
       }
+      isBusted = true
     }
     if (spin["-90°"] && !negAngles.map(ds => spin[ds]).find(x => x)) {
       for (let ds of negAngles) {
@@ -275,8 +283,11 @@ function performHackyRepairs(spins: Spin[]) {
       if (!spin["180°"]) {
         spin["180°"] = new Map(spin["-90°"])
       }
+      isBusted = true
     }
-  }  
+  }
+
+  return isBusted
 }
 
 function readPrinceton(files: { [key: string]: Uint8Array }) {

@@ -57,6 +57,7 @@ export function cloneSpinorama(data: SpinoramaData<Spin>): SpinoramaData<Spin> {
   const datasets = { ...data.datasets }
   spinKeys.filter(k => datasets[k]).forEach(k => datasets[k] = new Map(datasets[k]))
   return {
+    isBusted: data.isBusted,
     freq: [...data.freq],
     datasets,
   }
@@ -95,6 +96,7 @@ export function iirToSpin(freq: number[], biquads: Biquads) {
   }
 
   let spin: SpinoramaData<{ [key: string]: Map<number,number> }> = {
+    isBusted: false,
     freq: [...freq],
     datasets: { Overall: map },
   }

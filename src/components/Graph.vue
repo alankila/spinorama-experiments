@@ -1,8 +1,9 @@
 <script setup lang="ts" generic="T extends { [key: string]: Map<number, number> }">
 
-import type { Domain, GraphType } from '@/util/graphs';
-import type { SpinoramaData } from '@/util/loaders';
-import { onMounted, onUnmounted, ref, useTemplateRef, watchEffect } from 'vue';
+import * as d3 from "d3"
+import type { Domain, GraphType } from '@/util/graphs'
+import type { SpinoramaData } from '@/util/loaders'
+import { onMounted, onUnmounted, ref, useTemplateRef, watchEffect } from 'vue'
 
 const svg = useTemplateRef("svg")
 
@@ -24,6 +25,18 @@ watchEffect(() => {
   if (svg.value && refreshCounter.value) {
     render(svg.value, spin, datasets, regression, domain)
     renderedWidth = refreshCounter.value
+  }
+
+  const graph = d3.select(svg.value)
+  graph.selectAll(".busted").remove()
+
+  if (spin.isBusted) {
+    graph.append("g")
+    .attr("class", "busted")
+    .append("text")
+    .attr("fill", "#800")
+    .attr("transform", `translate(0, 20)`)
+    .text("Busted!")
   }
 });
 

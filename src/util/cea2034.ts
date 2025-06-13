@@ -118,11 +118,14 @@ function spatial_average<T extends { [key: string]: Map<number, number> }>(spins
     }
     
     /* Average the spins provided as argument. */
+    let isBusted = false
     for (let spin of spins) {
         for (let entry of Object.entries(spin.datasets)) {
             if (!datasetFilter(spin, entry[0])) {
                 continue
             }
+
+            isBusted ||= spin.isBusted
 
             for (let data of entry[1].entries()) {
                 let res = result.get(data[0])
@@ -140,6 +143,7 @@ function spatial_average<T extends { [key: string]: Map<number, number> }>(spins
 
     return {
         freq: spins[0].freq,
+        isBusted,
         datasets: {
             Average: new Map([...result].map(r => {
                 let [freq, data] = r
@@ -209,6 +213,7 @@ export function estimated_inroom(cea2034: SpinoramaData<CEA2034>) {
     }
     return {
         freq: cea2034.freq,
+        isBusted: cea2034.isBusted,
         datasets: {
             "Estimated In-Room": data,
         },
@@ -231,6 +236,7 @@ function early_reflections(horizSpin: SpinoramaData<Spin>, vertSpin: SpinoramaDa
 
     return {
         freq: floorBounce.freq,
+        isBusted: floorBounce.isBusted || ceilingBounce.isBusted || frontWallBounce.isBusted || sideWallBounce.isBusted || rearWallBounce.isBusted || totalHorizontalReflection.isBusted || totalVerticalReflection.isBusted || totalEarlyReflection.isBusted,
         datasets: {
             "Floor Bounce": floorBounce.datasets.Average,
             "Ceiling Bounce": ceilingBounce.datasets.Average,
@@ -284,6 +290,7 @@ export function compute_cea2034(horizSpin: SpinoramaData<Spin>, vertSpin: Spinor
 
     return {
         freq: horizSpin.freq,
+        isBusted: onaxis.isBusted || lw.isBusted || sp.isBusted || er.isBusted,
         datasets: {
             "On-Axis": onaxis.datasets.Average,
             "Listening Window": lw.datasets.Average,
