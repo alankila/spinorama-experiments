@@ -1,13 +1,14 @@
 import { estimated_inroom, type CEA2034 } from "./cea2034";
 import type { SpinoramaData } from "./loaders";
 
-interface Scores {
+export interface Scores {
     lfxHz: number,
     nbdOnAxis: number,
     nbdPredInRoom: number,
     smPredInRoom: number,
     tonality: number,
     tonalityNoLfxLimit: number,
+    isBusted: boolean,
 }
 
 const NBD_MIN_HZ = 100 /* NBD functions start at 100 Hz even if measurement covers below */
@@ -65,6 +66,7 @@ export function getScores(cea2034: SpinoramaData<CEA2034>): Scores {
         smPredInRoom,
         tonality: 12.69 - 2.49 * nbdOnAxis - 2.99 * nbdPredInRoom - 4.31 * Math.log10(lfxHz) + 2.32 * smPredInRoom,
         tonalityNoLfxLimit: 12.69 - 2.49 * nbdOnAxis - 2.99 * nbdPredInRoom - 4.31 * Math.log10(LFX_MIN_HZ) + 2.32 * smPredInRoom,
+        isBusted: cea2034.isBusted,
     }
 }
 
