@@ -14,7 +14,8 @@ async function listMeasurements(dir) {
 let files = await listMeasurements(dir)
 
 let count = 0
-let result: OurMetadata = {}
+let bustedCount = 0
+let ourMetadata: OurMetadata = {}
 for (let file of files) {
     const data = readFileSync(`${dir}/${file}`)
     try {
@@ -24,40 +25,44 @@ for (let file of files) {
         }
 
         const cea2034 = compute_cea2034(horizSpin, vertSpin)
-        const tonality = getScores(cea2034)
+        const scores = getScores(cea2034)
         const [speakerId, measurementId] = file.replace(".zip", "").split("/", 2)
 
-        if (!result[speakerId]) {
-            result[speakerId] = {
+        if (!ourMetadata[speakerId]) {
+            ourMetadata[speakerId] = {
                 brand: theirMetadata[speakerId].brand,
                 model: theirMetadata[speakerId].model,
                 type: theirMetadata[speakerId].type,
                 price: parseInt(theirMetadata[speakerId].price) || undefined,
                 shape: theirMetadata[speakerId].shape,
-                amount: theirMetadata[speakerId].amount ?? "unknown",
+                amount: theirMetadata[speakerId].amount ?? "each", /* this is just a guess */
                 defaultMeasurement: theirMetadata[speakerId].default_measurement,
                 measurements: {},
             }
         }
 
-        result[speakerId].measurements[measurementId] = {
+        ourMetadata[speakerId].measurements[measurementId] = {
             format: theirMetadata[speakerId].measurements[measurementId].format,
-            scores: tonality,
+            scores,
         }
 
-        count ++;
+        count ++
+        if (scores.isBusted) {
+            bustedCount ++
+        }
     }
     catch (error) {
         console.warn("Unable to process", file, error)
     }
 }
 
-for (let k of Object.values(result)) {
+for (let k of Object.values(ourMetadata)) {
     if (!(k.defaultMeasurement in k.measurements)) {
-        console.log("Default measurement doesn't exist in", k.brand, "/", k.model, "selecting random one")
+        console.warn("Default measurement doesn't exist in", k.brand, "/", k.model, "selecting random one")
         k.defaultMeasurement = Object.keys(k.measurements)[0]
     }
 }
 
-console.warn("Read", count, "/", files.length, "(", (100 * count / files.length).toFixed(1), "%)")
-console.log(JSON.stringify(result, undefined, 2))
+console.warn("Read", count, "/", files.length, "(", (100 * count / files.length).toFixed(1), "%),", bustedCount, "were busted (", (100 * bustedCount / files.length).toFixed(1), "%)")
+
+console.log(JSON.stringify(ourMetadata, undefined, 2))
