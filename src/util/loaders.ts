@@ -1,11 +1,8 @@
 import { spinKeys, type Spin } from "./cea2034";
-import _metadata from "@/metadata.json"
 import { iter } from "but-unzip";
 import { cloneSpinorama, pressure2spl, setToMeanOnAxisLevel } from "./spin-utils";
 // @ts-ignore
 import fftjs from "fft-js"
-
-export const metadata = _metadata
 
 export interface SpinoramaData<T extends { [key: string]: Map<number, number> }> {
   freq: number[],

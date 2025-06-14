@@ -1,7 +1,7 @@
 <script setup lang="ts">
 
 import { computed, ref, watchEffect } from "vue";
-import { readSpinoramaData, emptySpinorama, metadata, type SpinoramaData } from "@/util/loaders";
+import { readSpinoramaData, emptySpinorama, type SpinoramaData } from "@/util/loaders";
 import { useRouter } from "vue-router";
 import { compute_cea2034 as computeCea2034, estimated_inroom as estimateInRoom } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
@@ -9,14 +9,15 @@ import { Biquads } from "@/util/iir";
 import Graph from "@/components/Graph.vue";
 import { getScores, PIR_MIN_HZ, PIR_MAX_HZ } from "@/util/scores";
 import { iirAppliedSpin, iirToSpin, normalizedToOnAxis } from "@/util/spin-utils";
+import ourMetadata from "@/our-metadata.json"
 
-const { speakerId, measurementId } = defineProps<{ speakerId: keyof typeof metadata, measurementId: string }>();
+const { speakerId, measurementId } = defineProps<{ speakerId: keyof typeof ourMetadata, measurementId: string }>();
 const router = useRouter();
 
 const applyIir = ref(false);
 const showNormalized = ref(false);
 
-const measurements = Object.keys(metadata[speakerId].measurements)
+const measurements = Object.keys(ourMetadata[speakerId].measurements)
 const shownMeasurementId = ref(measurementId)
 
 let biquads: Biquads | undefined
@@ -92,7 +93,7 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
 
 <template>
   <div class="grid grid-cols-[max-content_1fr] grid-rows-[max-content_1fr] max-h-lvh">
-    <h1 class="text-3xl font-bold self-center p-4">{{ metadata[speakerId].brand }} {{ metadata[speakerId].model }}</h1>
+    <h1 class="text-3xl font-bold self-center p-4">{{ ourMetadata[speakerId].brand }} {{ ourMetadata[speakerId].model }}</h1>
 
     <div class="grid grid-flow-col auto-cols-max items-start gap-8 p-4">
       <div class="grid">

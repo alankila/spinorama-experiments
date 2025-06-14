@@ -7,6 +7,6 @@
 /public/eq
 /public/measurements
 /public/pictures
-/src/metadata.json
 /src/our-metadata.json
+/their-metadata.json
 

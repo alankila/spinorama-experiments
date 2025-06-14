@@ -40,6 +40,7 @@ for f in png jpg; do
 	done
 done
 
-echo "Take metadata.json from build"
-cp -a "$SPINORAMA/dist/json/metadata.json" "$SELF/src"
-
+echo "Convert metadata.py into their metadata JSON doc"
+pushd "$SPINORAMA"
+python3 -c 'from datas import metadata; import json; print(json.dumps(metadata.speakers_info))' > "$SELF/their-metadata.json"
+popd

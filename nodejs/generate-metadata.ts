@@ -1,7 +1,8 @@
 import { compute_cea2034 } from "../src/util/cea2034"
 import { processSpinoramaFile } from "../src/util/loaders"
-import { getScores, type Scores } from "../src/util/scores";
+import { getScores, OurMetadata, type Scores } from "../src/util/scores"
 import { readdirSync, readFileSync } from "fs"
+import theirMetadata from "../their-metadata.json"
 
 const dir = "public/measurements"
 
@@ -13,7 +14,7 @@ async function listMeasurements(dir) {
 let files = await listMeasurements(dir)
 
 let count = 0
-let result: { [key: string]: Scores } = {}
+let result: OurMetadata = {}
 for (let file of files) {
     const data = readFileSync(`${dir}/${file}`)
     try {
@@ -24,7 +25,26 @@ for (let file of files) {
 
         const cea2034 = compute_cea2034(horizSpin, vertSpin)
         const tonality = getScores(cea2034)
-        result[file.replace(".zip", "")] = tonality
+        const [speakerId, measurementId] = file.replace(".zip", "").split("/", 2)
+
+        if (!result[speakerId]) {
+            result[speakerId] = {
+                brand: theirMetadata[speakerId].brand,
+                model: theirMetadata[speakerId].model,
+                type: theirMetadata[speakerId].type,
+                price: parseInt(theirMetadata[speakerId].price) || undefined,
+                shape: theirMetadata[speakerId].shape,
+                amount: theirMetadata[speakerId].amount ?? "unknown",
+                defaultMeasurement: theirMetadata[speakerId].default_measurement,
+                measurements: {},
+            }
+        }
+
+        result[speakerId].measurements[measurementId] = {
+            format: theirMetadata[speakerId].measurements[measurementId].format,
+            scores: tonality,
+        }
+
         count ++;
     }
     catch (error) {
@@ -32,4 +52,12 @@ for (let file of files) {
     }
 }
 
-console.log(result)
+for (let k of Object.values(result)) {
+    if (!(k.defaultMeasurement in k.measurements)) {
+        console.log("Default measurement doesn't exist in", k.brand, "/", k.model, "selecting random one")
+        k.defaultMeasurement = Object.keys(k.measurements)[0]
+    }
+}
+
+console.warn("Read", count, "/", files.length, "(", (100 * count / files.length).toFixed(1), "%)")
+console.log(JSON.stringify(result, undefined, 2))

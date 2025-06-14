@@ -1,7 +1,8 @@
 <script setup lang="ts">
 
-import { metadata } from '@/util/loaders';
-import { onUnmounted, ref, watchEffect, type Ref } from 'vue';
+import ourMetadata from "@/our-metadata.json"
+import type { Speaker } from "@/util/scores";
+import { onUnmounted, ref, watchEffect, type Ref } from 'vue'
 
 /**
  * Delay execution of a function by configured delay. New calls reset the delay.
@@ -27,53 +28,28 @@ function debounce<T extends (...args: any) => void>(func: T, delay = 300) {
   }
 }
 
-type mdtype = typeof metadata;
-type Speaker = typeof metadata[keyof mdtype]
-
 const search = ref("");
 
 let filteredMetadata: Ref<[string, Speaker][]> = ref([])
 
 function tonalityScore(speaker: Speaker) {
-  // @ts-ignore
-  const measurement = speaker.measurements[speaker.default_measurement]?.pref_rating
-  if (!measurement) {
-    return undefined
-  }
-
-  /* NBD = narrow band deviation
-   * - split response into half-octave bands covering 100 Hz onwards.
-   * - reject band if its center is outside measurement bound (lowest frequency) or above 12000 Hz.
-   * - measure "mean average difference" of response within each band (subtract from mean, take absolute difference, then calculate the mean of the result)
-   * - then average all bands.
-   * 
-   * smoothness is the r² of the linear regression of the predicted in room response between 100 and 16000 Hz.
-   */
-  return (12.69 - 2.49 * measurement.nbd_on_axis - 2.99 * measurement.nbd_pred_in_room - 4.31 * Math.log10(measurement.lfx_hz) + 2.32 * measurement.sm_pred_in_room).toFixed(1)
+  return speaker.measurements[speaker.defaultMeasurement]?.scores?.tonality
 }
 
-/* bass extension is estimated by walking down the measurement from 300 Hz and finding the frequency where response is below -6 dB
- * and then returning the measurement point freq just above that. If response is above -6 dB for the entire range, then return lowest measured frequency. */
 function bassExtension(speaker: Speaker) {
-  // @ts-ignore
-  const measurement = speaker.measurements[speaker.default_measurement]?.pref_rating
-  return measurement?.lfx_hz
+  return speaker.measurements[speaker.defaultMeasurement]?.scores?.lfxHz
 }
 
-/* ref_band is computed from the maximum deviation above/below average in midrange which is 300-5000 Hz */
 function flatness(speaker: Speaker) {
-  // @ts-ignore
-  const measurement = speaker.measurements[speaker.default_measurement]?.estimates
-  return measurement?.ref_band?.toFixed(1)
+  return speaker.measurements[speaker.defaultMeasurement]?.scores?.flatness
 }
 
 function format(speaker: Speaker) {
-  // @ts-ignore
-  return speaker.measurements[speaker.default_measurement]?.format;
+  return speaker.measurements[speaker.defaultMeasurement]?.format
 }
 
 const filterMetadata = debounce((lcSearch: string) => {
-  filteredMetadata.value = Object.entries(metadata).filter(entry => {
+  filteredMetadata.value = Object.entries(ourMetadata).filter(entry => {
     let result = true
     if (result && lcSearch) {
       result &&= `${entry[1].brand} ${entry[1].model}`.toLowerCase().indexOf(lcSearch) !== -1
@@ -104,14 +80,14 @@ watchEffect(() => {
           {{speaker.brand}} {{speaker.model}}
         </div>
         <div>
-          Price: <span class="font-bold">${{speaker.price}}</span><br/>
-          Tonality: <span class="font-bold">{{ tonalityScore(speaker) }}</span><br/>
-          Bass extension: <span class="font-bold">{{ bassExtension(speaker) }}&#x202f;Hz</span><br/>
-          Flatness: <span class="font-bold">&pm;{{ flatness(speaker) }}&#x202f;dB</span></br>
+          Price: <span class="font-bold">${{speaker.price ?? "–"}}</span><br/>
+          Tonality: <span class="font-bold">{{ tonalityScore(speaker)?.toFixed(1) }}</span><br/>
+          Bass extension: <span class="font-bold">{{ bassExtension(speaker)?.toFixed(1) }}&#x202f;Hz</span><br/>
+          Flatness: <span class="font-bold">&pm;{{ flatness(speaker)?.toFixed(1) }}&#x202f;dB</span></br>
         </div>
         <div class="border-t pt-2 w-full text-center">
-          <RouterLink :to="`view/${encodeURI(speakerId)}/${encodeURI(speaker.default_measurement)}`">
-            {{ speaker.default_measurement }}
+          <RouterLink :to="`view/${encodeURI(speakerId)}/${encodeURI(speaker.defaultMeasurement)}`">
+            {{ speaker.defaultMeasurement }}
           </RouterLink>
           <span :class="['klippel', 'spl_hv_txt', 'gll_hv_txt', 'princeton'].indexOf(format(speaker)) !== -1 ? 'text-green-700' : 'text-red-700'"> ({{ format(speaker) }})</span>
         </div>

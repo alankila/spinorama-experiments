@@ -1,6 +1,26 @@
 import { estimated_inroom, type CEA2034 } from "./cea2034";
 import type { SpinoramaData } from "./loaders";
 
+export interface OurMetadata {
+    [speakerId: string]: Speaker,
+}
+
+export interface Speaker {
+    brand: string,
+    model: string,
+    type: string,
+    price?: number,
+    shape: string,
+    amount: string,
+    defaultMeasurement: string,
+    measurements: {
+        [key: string]: {
+            format: string,
+            scores: Scores,
+        }
+    },
+}
+
 export interface Scores {
     lfxHz: number,
     nbdOnAxis: number,
@@ -63,11 +83,11 @@ function octave(count: number) {
 export function getScores(cea2034: SpinoramaData<CEA2034>): Scores {
     const lfxHz = computeLfxHz(cea2034)
     const pir = estimated_inroom(cea2034)
-    const nbdOnAxis = nbd(cea2034, "On-Axis")
-    const nbdPredInRoom = nbd(pir, "Estimated In-Room")
-    const smPredInRoom = sm(pir, "Estimated In-Room")
-    const midrangeMean = meanOverRange(cea2034, "On-Axis", MIDRANGE_MIN, MIDRANGE_MAX)
-    const flatness = [...cea2034.datasets["On-Axis"]].filter(p => p[0] >= MIDRANGE_MIN && p[0] <= MIDRANGE_MAX).map(p => Math.abs(p[1] - midrangeMean)).reduce((a, b) => a > b ? a : b, 0)
+    const nbdOnAxis = nbd(cea2034, "On-Axis") || 0
+    const nbdPredInRoom = nbd(pir, "Estimated In-Room") || 0
+    const smPredInRoom = sm(pir, "Estimated In-Room") || 1
+    const midrangeMean = meanOverRange(cea2034, "On-Axis", MIDRANGE_MIN, MIDRANGE_MAX) || 0
+    const flatness = [...cea2034.datasets["On-Axis"]].filter(p => p[0] >= MIDRANGE_MIN && p[0] <= MIDRANGE_MAX).map(p => Math.abs(p[1] - midrangeMean)).reduce((a, b) => a > b ? a : b, 0) || 0
 
     return {
         lfxHz,
