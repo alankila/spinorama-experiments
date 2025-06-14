@@ -14,13 +14,9 @@ Goals:
 
 Practical steps:
 
-1. Develop required loaders. Most notable missing types: princeton (impulse response in matlab v4 files), webplot digitizer (various graphs provided for display), rew text dump (similar)
+1. Develop required loaders. Most notable missing types: webplot digitizer (various graphs provided for display), rew text dump (similar)
 
-2. Make offline analysis step that uses all the loaders and the developed analysis functions offline
-   and creates metadata document that replicates the build result from spinorama presently.
+2. Develop every other missing function like tables, statistics, comparison charts, etc. etc. etc.
 
-3. Add supplementary data for various speakers e.g. Price per unit, Vendor, Model, etc. are needed to maintain usefulness.
-   An issue with pricing data is that it is subject to inflation, customs fees, etc. It might be necessary to adjust these figures over time.
-
-4. Develop every other missing function like tables, statistics, comparison charts, etc. etc. etc.
+3. Consider how to really deal with missing data. Currently I'm forcing all measurements to become complete by duplicating and copying measurement traces, but marking all measurements as "busted" which have this sort of fixing performed.
 
