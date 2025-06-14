@@ -1,6 +1,6 @@
 import { compute_cea2034 } from "../src/util/cea2034"
 import { processSpinoramaFile } from "../src/util/loaders"
-import { getScores, OurMetadata, type Scores } from "../src/util/scores"
+import { getScores, OurMetadata } from "../src/util/scores"
 import { readdirSync, readFileSync } from "fs"
 import theirMetadata from "../their-metadata.json"
 
@@ -29,14 +29,19 @@ for (let file of files) {
         const [speakerId, measurementId] = file.replace(".zip", "").split("/", 2)
 
         if (!ourMetadata[speakerId]) {
+            const theirs = <typeof theirMetadata[keyof typeof theirMetadata]>theirMetadata[speakerId]
+            if (!theirs) {
+                console.warn("No metadata for speaker", speakerId)
+                continue
+            }
             ourMetadata[speakerId] = {
-                brand: theirMetadata[speakerId].brand,
-                model: theirMetadata[speakerId].model,
-                type: theirMetadata[speakerId].type,
-                price: parseInt(theirMetadata[speakerId].price) || undefined,
-                shape: theirMetadata[speakerId].shape,
-                amount: theirMetadata[speakerId].amount ?? "each", /* this is just a guess */
-                defaultMeasurement: theirMetadata[speakerId].default_measurement,
+                brand: theirs.brand,
+                model: theirs.model,
+                type: theirs.type,
+                price: parseInt(theirs.price) || undefined,
+                shape: theirs.shape,
+                amount: ("amount" in theirs ? theirs.amount : "each"), /* this is just a guess */
+                defaultMeasurement: theirs.default_measurement,
                 measurements: {},
             }
         }
