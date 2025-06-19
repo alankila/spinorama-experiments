@@ -32,20 +32,12 @@ const search = ref("");
 
 let filteredMetadata: Ref<[string, Speaker][]> = ref([])
 
-function tonalityScore(speaker: Speaker) {
-  return speaker.measurements[speaker.defaultMeasurement]?.scores?.tonality
-}
-
-function bassExtension(speaker: Speaker) {
-  return speaker.measurements[speaker.defaultMeasurement]?.scores?.lfxHz
-}
-
-function flatness(speaker: Speaker) {
-  return speaker.measurements[speaker.defaultMeasurement]?.scores?.flatness
+function tonality(speaker: Speaker) {
+  return speaker.measurements[speaker.defaultMeasurement].scores
 }
 
 function format(speaker: Speaker) {
-  return speaker.measurements[speaker.defaultMeasurement]?.format
+  return speaker.measurements[speaker.defaultMeasurement].format
 }
 
 const filterMetadata = debounce((lcSearch: string) => {
@@ -81,15 +73,15 @@ watchEffect(() => {
         </div>
         <div>
           Price: <span class="font-bold">${{speaker.price ?? "–"}}</span><br/>
-          Tonality: <span class="font-bold">{{ tonalityScore(speaker)?.toFixed(1) }}</span><br/>
-          Bass extension: <span class="font-bold">{{ bassExtension(speaker)?.toFixed(1) }}&#x202f;Hz</span><br/>
-          Flatness: <span class="font-bold">&pm;{{ flatness(speaker)?.toFixed(1) }}&#x202f;dB</span></br>
+          Tonality: <span class="font-bold">{{ tonality(speaker).tonality.toFixed(1) }}</span><br/>
+          Bass extension: <span class="font-bold">{{ tonality(speaker).lfxHz.toFixed(1) }}&#x202f;Hz</span><br/>
+          Flatness: <span class="font-bold">&pm;{{ tonality(speaker).flatness.toFixed(1) }}&#x202f;dB</span></br>
         </div>
         <div class="border-t pt-2 w-full text-center">
           <RouterLink :to="`view/${encodeURI(speakerId)}/${encodeURI(speaker.defaultMeasurement)}`">
             {{ speaker.defaultMeasurement }}
           </RouterLink>
-          <span :class="['klippel', 'spl_hv_txt', 'gll_hv_txt', 'princeton'].indexOf(format(speaker)) !== -1 ? 'text-green-700' : 'text-red-700'"> ({{ format(speaker) }})</span>
+          <span :class="tonality(speaker).isBusted ? 'text-red-700' : 'text-green-700'"> ({{ format(speaker) }})</span>
         </div>
       </div>
     </div>
