@@ -23,7 +23,7 @@ const shownMeasurementId = ref(measurementId)
 let biquads: Biquads | undefined
 let iirSpin: SpinoramaData<{ [key: string]: Map<number, number> }> | undefined;
 try {
-  const baseEq = router.resolve("/").href + `eq/${speakerId}/iir-autoeq.txt`;
+  const baseEq = router.resolve("/").href + `eq/${encodeURIComponent(speakerId)}/iir-autoeq.txt`;
   const iirRequest = await fetch(baseEq)
   if (iirRequest.status != 200) {
     throw new Error(` APO file status not 200: ${iirRequest.status} ${iirRequest.statusText}`)
@@ -45,12 +45,13 @@ catch (error) {
   console.log("Unable to read equalization data", error)
 }
 
-/* Danger: recall that all reactive properties must be accessed before first await */
 let horizSpin = ref(emptySpinorama);
 let vertSpin = ref(emptySpinorama);
+
+/* Danger: recall that all reactive properties must be accessed before first await */
 watchEffect(async () => {
   const measurementId = shownMeasurementId.value
-  const baseMeasurement = router.resolve("/").href + `measurements/${speakerId}/${measurementId}.zip`
+  const baseMeasurement = router.resolve("/").href + `measurements/${encodeURIComponent(speakerId)}/${encodeURIComponent(measurementId)}.zip`
 
   try {
     [horizSpin.value, vertSpin.value] = await readSpinoramaData(baseMeasurement)

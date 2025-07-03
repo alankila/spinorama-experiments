@@ -1,12 +1,15 @@
-import { spinKeys, type Spin } from "./cea2034";
+import { spinKeys, type CEA2034, type Spin } from "./cea2034";
 import { iter } from "but-unzip";
 import { cloneSpinorama, pressure2spl, setToMeanOnAxisLevel } from "./spin-utils";
 // @ts-ignore
 import fftjs from "fft-js"
 
 export interface SpinoramaData<T extends { [key: string]: Map<number, number> }> {
+  /** Frequencies present on every dataset, in ascending order */
   freq: number[],
+  /** Datasets available */
   datasets: T,
+  /** Whether repairs had to be performed on the data like replicating or mirroring measurements to deal with missing data */
   isBusted: boolean,
 }
 
@@ -37,22 +40,93 @@ async function unzip(data: Uint8Array) {
   return txtFiles
 }
 
-export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin>[]> {
-  console.time("load")
-
-  const graphResult = await fetch(encodeURI(url))
-  if (graphResult.status != 200) {
-    throw new Error(`Unable to find data: ${url}: ${graphResult.status} ${graphResult.statusText}`)
+/**
+ * Some measurement types are able to provide us with e.g. CEA2034 directly, but lack the full spin.
+ * These are e.g. REW measurement suites and web plot digitized speakers.
+ * We might not get every measurement we'd like to display, so we get tons of partials, instead.
+ * 
+ * The only graph guaranteed to be present is On-Axis, though this is not asserted at type level.
+ */
+export async function readCEA2034(url: string): Promise<SpinoramaData<Partial<CEA2034>>> {
+  const zipRequest = await fetch(url)
+  if (zipRequest.status != 200) {
+    throw new Error(`Unable to find data: ${url}: ${zipRequest.status} ${zipRequest.statusText}`)
   }
-  const binaryData = await graphResult.arrayBuffer()
-  return processSpinoramaFile(new Uint8Array(binaryData))
+  const zipData = await zipRequest.arrayBuffer()
+  const files = await unzip(new Uint8Array(zipData))
+
+  const webplot = Object.entries(files).find(f => f[0].endsWith(".json"))
+  let cea2034: Partial<CEA2034>;
+  if (webplot) {
+    cea2034 = readWebplotDigitizer(webplot[1])
+  } else {
+    throw new Error(`Unknown file format: didn't recognize any files: ${Object.keys(files)}`)
+  }
+
+  if (!cea2034["On-Axis"]) {
+    throw new Error(`Missing a dataset: On-Axis; found: ${Object.keys(cea2034)}`)
+  }
+  const freq = [...cea2034["On-Axis"].keys()]
+  freq.sort((a, b) => a - b)
+
+  for (let ds of Object.entries(cea2034)) {
+    let freq2 = [...ds[1].keys()];
+    freq2.sort((a, b) => a - b)
+    if (JSON.stringify(freq) !== JSON.stringify(freq2)) {
+      throw new Error(`Dataset frequencies are not same as in the spin in general on dataset: ${ds[0]}`)
+    }
+  }
+
+  return {
+    freq,
+    isBusted: false,
+    datasets: cea2034,
+  }
 }
 
-export async function processSpinoramaFile(binaryData: Uint8Array) {
-  const files = await unzip(binaryData)
+function readWebplotDigitizer(file: Uint8Array): Partial<CEA2034> {
+  const webplot: {
+    datasetColl: {
+      data: {
+        value: [number, number]
+      }[],
+      name: string,
+    }[],
+  } = JSON.parse(utf8Decoder.decode(file))
+
+  const cea2034: Partial<CEA2034> = {}
+
+  for (let ds of webplot.datasetColl) {
+    if (ds.name === "On Axis") {
+      cea2034["On-Axis"] = readWebplotData(ds.data)
+    } else if (ds.name === "Early Reflections") {
+      cea2034["Total Early Reflections"] = readWebplotData(ds.data)
+    } else if (ds.name === "Sound Power" || ds.name == "Sound Power DI") {
+      cea2034[ds.name] = readWebplotData(ds.data)
+    } else if (ds.name === "First Reflections DI") {
+      cea2034["Early Reflections DI"] = readWebplotData(ds.data)
+    } else {
+      console.log("Unrecognized measurement", ds.name);
+    }
+  }
+
+  return cea2034
+}
+
+function readWebplotData(data: { value: [number, number] }[]) {
+  return new Map(data.map(d => d.value));
+}
+
+/** Read measurements that are full spinorama spins. */
+export async function readSpinoramaData(url: string): Promise<SpinoramaData<Spin>[]> {
+  const zipRequest = await fetch(url)
+  if (zipRequest.status != 200) {
+    throw new Error(`Unable to find data: ${url}: ${zipRequest.status} ${zipRequest.statusText}`)
+  }
+  const zipData = await zipRequest.arrayBuffer()
+  const files = await unzip(new Uint8Array(zipData))
 
   let spins: Spin[];
-
   if ("SPL Horizontal.txt" in files && "SPL Vertical.txt" in files) {
     spins = readKlippel(files);
   } else if (Object.keys(files).find(f => f.endsWith("_H 0.txt") || f.endsWith("0_H.txt"))) {
@@ -100,7 +174,6 @@ export async function processSpinoramaFile(binaryData: Uint8Array) {
     throw new Error(`Inconsistent use of frequencies across datasets`)
   }
 
-  //console.log(spindatas[0].freq.length * spinKeys.length * 2, "datapoints loaded over", spindatas[0].freq.length, "frequencies covering range", spindatas[0].freq[0], "Hz -", spindatas[0].freq[spindatas[0].freq.length - 1], "Hz")
   return spindatas
 }
 
