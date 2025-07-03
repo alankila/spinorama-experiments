@@ -15,42 +15,49 @@ async function listMeasurements(dir) {
 
 let files = await listMeasurements(dir)
 
-let count = 0
+let readCount = 0
 let bustedCount = 0
 let ourMetadata: OurMetadata = {}
 for (let file of files) {
     let exceptions: Error[] = []
 
     const [speakerId, measurementId] = file.replace(".zip", "").split("/", 2)
-    const data = readFileSync(`${dir}/${file}`)
+    const theirs = <typeof theirMetadata[keyof typeof theirMetadata]>theirMetadata[speakerId]
+    if (!theirs) {
+        console.warn("No metadata for speaker", speakerId)
+        continue
+    }
+
     let cea2034: SpinoramaData<CEA2034> | undefined
-    try {
-        const [horizSpin, vertSpin] = await processSpinoramaFile(new Uint8Array(data))
-        if (horizSpin.isBusted || vertSpin.isBusted) {
-            console.warn("Busted measurement", file)
+    {
+        const data = readFileSync(`${dir}/${file}`)
+        try {
+            const [horizSpin, vertSpin] = await processSpinoramaFile(new Uint8Array(data))
+            if (horizSpin.isBusted || vertSpin.isBusted) {
+                console.warn("Busted measurement", file)
+            }
+
+            cea2034 = computeCea2034(horizSpin, vertSpin)
+        }
+        catch (error) {
+            exceptions.push(error)
         }
 
-        cea2034 = computeCea2034(horizSpin, vertSpin)
-    }
-    catch (error) {
-        exceptions.push(error)
-    }
-
-    try {
-        cea2034 = await processCea2034File(new Uint8Array(data))
-    }
-    catch (error) {
-        exceptions.push(error)
+        try {
+            cea2034 = await processCea2034File(new Uint8Array(data))
+        }
+        catch (error) {
+            exceptions.push(error)
+        }
     }
 
     if (!cea2034) {
-        console.log("Unable to process file", file, exceptions)
+        console.warn(file, "/", theirs.measurements[measurementId]?.format, ":", exceptions)
         continue
     }
 
     const scores = getScores(cea2034)
     if (!ourMetadata[speakerId]) {
-        const theirs = <typeof theirMetadata[keyof typeof theirMetadata]>theirMetadata[speakerId]
         if (!theirs) {
             console.warn("No metadata for speaker", speakerId)
             continue
@@ -68,16 +75,14 @@ for (let file of files) {
     }
 
     ourMetadata[speakerId].measurements[measurementId] = {
-        format: theirMetadata[speakerId].measurements[measurementId].format,
+        format: theirs.measurements[measurementId]?.format,
         scores,
     }
 
-    count ++
+    readCount ++
     if (scores.isBusted) {
         bustedCount ++
     }
-
-    console.log("No loader for", file)
 }
 
 for (let k of Object.values(ourMetadata)) {
@@ -87,6 +92,6 @@ for (let k of Object.values(ourMetadata)) {
     }
 }
 
-console.warn("Read", count, "/", files.length, "(", (100 * count / files.length).toFixed(1), "%),", bustedCount, "were busted (", (100 * bustedCount / files.length).toFixed(1), "%)")
+console.warn("Read", readCount, "/", files.length, "(", (100 * readCount / files.length).toFixed(1), "%),", bustedCount, "were busted (", (100 * bustedCount / files.length).toFixed(1), "%)")
 
 console.log(JSON.stringify(ourMetadata, undefined, 2))

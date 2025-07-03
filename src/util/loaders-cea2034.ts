@@ -14,12 +14,12 @@ const utf8Decoder = new TextDecoder("utf-8")
 export async function processCea2034File(zipData: Uint8Array): Promise<SpinoramaData<CEA2034>> {
   const files = unzip(zipData)
 
-  const webplot = files.find(f => f.filename.endsWith(".json"))
+  const webplot = files.find(f => f.filename.endsWith("wpd.json"))
   let cea2034: CEA2034;
   if (webplot) {
     cea2034 = readWebplotDigitizer(await webplot.read())
   } else {
-    throw new Error(`Unknown file format: didn't recognize any files: ${Object.keys(files)}`)
+    throw new Error(`Unknown file format: didn't recognize any files: ${files.map(f => f.filename)}`)
   }
 
   if (!cea2034["On-Axis"]) {
@@ -36,7 +36,7 @@ export async function processCea2034File(zipData: Uint8Array): Promise<Spinorama
     let freq2 = [...cea2034[ds].keys()];
     freq2.sort((a, b) => a - b)
     if (JSON.stringify(freq) !== JSON.stringify(freq2)) {
-      throw new Error(`Dataset frequencies are not same as in the spin in general on dataset: ${ds[0]}`)
+      throw new Error(`Dataset frequencies are not same as in the spin in general on dataset: ${ds}`)
     }
   }
 
@@ -61,16 +61,20 @@ function readWebplotDigitizer(file: Uint8Array): CEA2034 {
   const cea2034: CEA2034 = {}
 
   for (let ds of webplot.datasetColl) {
-    if (ds.name === "On Axis") {
+    if (ds.name.toLowerCase() === "on axis" || ds.name === "OA" || ds.name === "ON") {
       cea2034["On-Axis"] = readWebplotData(ds.data)
-    } else if (ds.name === "Early Reflections") {
+    } else if (ds.name.toLowerCase() === "listening window" || ds.name === "LW") {
+      cea2034["Listening Window"] = readWebplotData(ds.data)
+    } else if (ds.name.toLowerCase() === "early reflections" || ds.name === "ER") {
       cea2034["Total Early Reflections"] = readWebplotData(ds.data)
-    } else if (ds.name === "Sound Power" || ds.name == "Sound Power DI") {
-      cea2034[ds.name] = readWebplotData(ds.data)
-    } else if (ds.name === "First Reflections DI") {
+    } else if (ds.name.toLowerCase() === "sound power" || ds.name == "SP") {
+      cea2034["Sound Power"] = readWebplotData(ds.data)
+    } else if (ds.name.toLowerCase() === "sound power di" || ds.name == "SPD") {
+      cea2034["Sound Power DI"] = readWebplotData(ds.data)
+    } else if (ds.name.toLowerCase() === "first reflections di" || ds.name.toLowerCase() === "early reflections di" || ds.name === "ERD") {
       cea2034["Early Reflections DI"] = readWebplotData(ds.data)
     } else {
-      console.log("Unrecognized measurement", ds.name);
+      console.warn("Unrecognized measurement", ds.name);
     }
   }
 
