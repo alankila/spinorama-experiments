@@ -1,4 +1,4 @@
-import { unzip } from "but-unzip";
+import { unzip, type ZipItem } from "but-unzip";
 import { cea2034Keys, type CEA2034 } from "./cea2034";
 import type { SpinoramaData } from "./loaders-spin";
 
@@ -14,10 +14,11 @@ const utf8Decoder = new TextDecoder("utf-8")
 export async function processCea2034File(zipData: Uint8Array): Promise<SpinoramaData<CEA2034>> {
   const files = unzip(zipData)
 
-  const webplot = files.find(f => f.filename.endsWith("wpd.json"))
   let cea2034: CEA2034;
-  if (webplot) {
-    cea2034 = readWebplotDigitizer(await webplot.read())
+  if (files.find(f => f.filename.endsWith("wpd.json"))) {
+    cea2034 = await readWebplotDigitizer(files)
+  } else if (files.find(f => f.filename.endsWith("On Axis.txt"))) {
+    cea2034 = await readRewTextDump(files)
   } else {
     throw new Error(`Unknown file format: didn't recognize any files: ${files.map(f => f.filename)}`)
   }
@@ -38,7 +39,9 @@ export async function processCea2034File(zipData: Uint8Array): Promise<Spinorama
   }
 }
 
-function readWebplotDigitizer(file: Uint8Array): CEA2034 {
+async function readWebplotDigitizer(files: ZipItem[]) {
+  const file = await files.find(f => f.filename.endsWith("wpd.json"))!.read()
+
   const webplot: {
     datasetColl: {
       data: {
@@ -74,4 +77,36 @@ function readWebplotDigitizer(file: Uint8Array): CEA2034 {
 
 function readWebplotData(data: { value: [number, number] }[]) {
   return new Map(data.map(d => d.value));
+}
+
+async function readRewTextDump(files: ZipItem[]) {
+  // @ts-ignore we will validate that the set is complete later
+  const cea2034: CEA2034 = {}
+
+  cea2034["On-Axis"] = await readRewFile(files, "On Axis.txt")
+  cea2034["Listening Window"] = await readRewFile(files, "LW.txt")
+  cea2034["Total Early Reflections"] = await readRewFile(files, "ER.txt")
+  cea2034["Sound Power"] = await readRewFile(files, "SP.txt")
+  cea2034["Sound Power DI"] = await readRewFile(files, "DI.txt")
+  cea2034["Early Reflections DI"] = await readRewFile(files, "ERDI.txt")
+
+  return cea2034
+}
+
+async function readRewFile(files: ZipItem[], name: string) {
+  const file = files.find(f => f.filename.endsWith(name))
+  if (!file) {
+    throw new Error(`Missing file ${name}`)
+  }
+
+  const result = new Map<number, number>()
+  const data = utf8Decoder.decode(await file.read())
+  for (let row of data.split(/\s*\n/)) {
+    if (row.startsWith("*")) {
+      continue
+    }
+    const data = row.split(/\t/).map(p => parseFloat(p))
+    result.set(data[0], data[1])
+  }
+  return result
 }
