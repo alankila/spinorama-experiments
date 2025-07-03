@@ -2,7 +2,7 @@
 
 import * as d3 from "d3"
 import type { Domain, GraphType } from '@/util/graphs'
-import type { SpinoramaData } from '@/util/loaders'
+import type { SpinoramaData } from '@/util/loaders-spin'
 import { onMounted, onUnmounted, ref, useTemplateRef, watchEffect } from 'vue'
 
 const svg = useTemplateRef("svg")

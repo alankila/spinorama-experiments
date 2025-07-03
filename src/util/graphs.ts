@@ -1,7 +1,7 @@
 import * as d3 from "d3"
 // @ts-ignore no types for this
 import * as d3reg from "d3-regression"
-import { type SpinoramaData } from "./loaders"
+import { type SpinoramaData } from "./loaders-spin"
 import type { CEA2034, Spin } from "./cea2034"
 import { MIDRANGE_MAX, MIDRANGE_MIN } from "./scores"
 

@@ -1,5 +1,5 @@
-import { estimated_inroom, type CEA2034 } from "./cea2034";
-import type { SpinoramaData } from "./loaders";
+import { estimatedInRoom, type CEA2034 } from "./cea2034";
+import type { SpinoramaData } from "./loaders-spin";
 
 export interface OurMetadata {
     [speakerId: string]: Speaker,
@@ -82,7 +82,7 @@ function octave(count: number) {
 
 export function getScores(cea2034: SpinoramaData<CEA2034>): Scores {
     const lfxHz = computeLfxHz(cea2034)
-    const pir = estimated_inroom(cea2034)
+    const pir = estimatedInRoom(cea2034)
     const nbdOnAxis = nbd(cea2034, "On-Axis") || 0
     const nbdPredInRoom = nbd(pir, "Estimated In-Room") || 0
     const smPredInRoom = sm(pir, "Estimated In-Room") || 1

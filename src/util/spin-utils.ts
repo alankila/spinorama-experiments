@@ -1,6 +1,6 @@
 import { spinKeys, type Spin } from "./cea2034";
 import type { Biquads } from "./iir";
-import type { SpinoramaData } from "./loaders";
+import type { SpinoramaData } from "./loaders-spin";
 
 
 /**

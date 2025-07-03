@@ -1,5 +1,7 @@
-import { compute_cea2034 } from "../src/util/cea2034"
-import { processSpinoramaFile } from "../src/util/loaders"
+import { SpinoramaData } from './../src/util/loaders-spin';
+import { CEA2034, computeCea2034 } from "../src/util/cea2034"
+import { processSpinoramaFile } from "../src/util/loaders-spin"
+import { processCea2034File } from "../src/util/loaders-cea2034"
 import { getScores, OurMetadata } from "../src/util/scores"
 import { readdirSync, readFileSync } from "fs"
 import theirMetadata from "../their-metadata.json"
@@ -17,48 +19,65 @@ let count = 0
 let bustedCount = 0
 let ourMetadata: OurMetadata = {}
 for (let file of files) {
+    let exceptions: Error[] = []
+
+    const [speakerId, measurementId] = file.replace(".zip", "").split("/", 2)
     const data = readFileSync(`${dir}/${file}`)
+    let cea2034: SpinoramaData<CEA2034> | undefined
     try {
         const [horizSpin, vertSpin] = await processSpinoramaFile(new Uint8Array(data))
         if (horizSpin.isBusted || vertSpin.isBusted) {
             console.warn("Busted measurement", file)
         }
 
-        const cea2034 = compute_cea2034(horizSpin, vertSpin)
-        const scores = getScores(cea2034)
-        const [speakerId, measurementId] = file.replace(".zip", "").split("/", 2)
-
-        if (!ourMetadata[speakerId]) {
-            const theirs = <typeof theirMetadata[keyof typeof theirMetadata]>theirMetadata[speakerId]
-            if (!theirs) {
-                console.warn("No metadata for speaker", speakerId)
-                continue
-            }
-            ourMetadata[speakerId] = {
-                brand: theirs.brand,
-                model: theirs.model,
-                type: theirs.type,
-                price: parseInt(theirs.price) || undefined,
-                shape: theirs.shape,
-                amount: ("amount" in theirs ? theirs.amount : "each"), /* this is just a guess */
-                defaultMeasurement: theirs.default_measurement,
-                measurements: {},
-            }
-        }
-
-        ourMetadata[speakerId].measurements[measurementId] = {
-            format: theirMetadata[speakerId].measurements[measurementId].format,
-            scores,
-        }
-
-        count ++
-        if (scores.isBusted) {
-            bustedCount ++
-        }
+        cea2034 = computeCea2034(horizSpin, vertSpin)
     }
     catch (error) {
-        console.warn("Unable to process", file, error)
+        exceptions.push(error)
     }
+
+    try {
+        cea2034 = await processCea2034File(new Uint8Array(data))
+    }
+    catch (error) {
+        exceptions.push(error)
+    }
+
+    if (!cea2034) {
+        console.log("Unable to process file", file, exceptions)
+        continue
+    }
+
+    const scores = getScores(cea2034)
+    if (!ourMetadata[speakerId]) {
+        const theirs = <typeof theirMetadata[keyof typeof theirMetadata]>theirMetadata[speakerId]
+        if (!theirs) {
+            console.warn("No metadata for speaker", speakerId)
+            continue
+        }
+        ourMetadata[speakerId] = {
+            brand: theirs.brand,
+            model: theirs.model,
+            type: theirs.type,
+            price: parseInt(theirs.price) || undefined,
+            shape: theirs.shape,
+            amount: ("amount" in theirs ? theirs.amount : "each"), /* this is just a guess */
+            defaultMeasurement: theirs.default_measurement,
+            measurements: {},
+        }
+    }
+
+    ourMetadata[speakerId].measurements[measurementId] = {
+        format: theirMetadata[speakerId].measurements[measurementId].format,
+        scores,
+    }
+
+    count ++
+    if (scores.isBusted) {
+        bustedCount ++
+    }
+
+    console.log("No loader for", file)
 }
 
 for (let k of Object.values(ourMetadata)) {
