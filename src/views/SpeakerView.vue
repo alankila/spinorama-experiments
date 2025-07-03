@@ -3,13 +3,14 @@
 import { computed, ref, watchEffect } from "vue";
 import { getZipData, processSpinoramaFile, type SpinoramaData } from "@/util/loaders-spin";
 import { useRouter } from "vue-router";
-import { computeCea2034 as computeCea2034, computeEarlyReflections, estimatedInRoom as estimateInRoom, type Spin } from "@/util/cea2034";
+import { computeCea2034 as computeCea2034, computeEarlyReflections, estimatedInRoom as estimateInRoom, type CEA2034, type Spin } from "@/util/cea2034";
 import { renderCea2034Plot, renderContour, renderFreqPlot } from "@/util/graphs";
 import { Biquads } from "@/util/iir";
 import Graph from "@/components/Graph.vue";
-import { getScores, PIR_MIN_HZ, PIR_MAX_HZ } from "@/util/scores";
+import { getScores, PIR_MIN_HZ, PIR_MAX_HZ, type OurMetadata } from "@/util/scores";
 import { iirAppliedSpin, iirToSpin, normalizedToOnAxis } from "@/util/spin-utils";
 import ourMetadata from "@/our-metadata.json"
+import { processCea2034File } from "@/util/loaders-cea2034";
 
 const { speakerId, measurementId } = defineProps<{ speakerId: keyof typeof ourMetadata, measurementId: string }>();
 const router = useRouter();
@@ -45,26 +46,33 @@ catch (error) {
   console.log("Unable to read equalization data", error)
 }
 
-let horizSpin = ref(<SpinoramaData<Spin>|undefined>undefined);
-let vertSpin = ref(<SpinoramaData<Spin>|undefined>undefined);
+/* Data sources to visualize. We have either the CEA2034 data, or digitized measurement */
+let horizSpin = ref(<SpinoramaData<Spin>|undefined>undefined)
+let vertSpin = ref(<SpinoramaData<Spin>|undefined>undefined)
+let cea2034Dump = ref(<SpinoramaData<CEA2034>|undefined>undefined)
 
 /* Danger: recall that all reactive properties must be accessed before first await */
 watchEffect(async () => {
-  const measurementId = shownMeasurementId.value
-  const baseMeasurement = router.resolve("/").href + `measurements/${encodeURIComponent(speakerId)}/${encodeURIComponent(measurementId)}.zip`
+  const baseMeasurement = router.resolve("/").href + `measurements/${encodeURIComponent(speakerId)}/${encodeURIComponent(shownMeasurementId.value)}.zip`
+  const zip = await getZipData(baseMeasurement);
 
   try {
-    const zip = await getZipData(baseMeasurement);
     [horizSpin.value, vertSpin.value] = await processSpinoramaFile(zip)
   }
   catch (error) {
-    console.log(error);
-    alert(`Error loading ${speakerId}/${measurementId} data: ` + error)
+    /* Maybe not working because it's not a real spin */
+
+    try {
+      cea2034Dump.value = await processCea2034File(zip)
+    }
+    catch (error2) {
+      /* If this also fails, we're in trouble... */
+      console.log("Errors during load", error, error2)
+      alert("Failed to read data for the speaker model -- shouldn't happen");
+    }
   }
 })
 
-
-/* Not affected by eq, so cached as-is */
 const horizontalContour = computed(() => {
   if (!horizSpin.value) {
     return undefined
@@ -87,12 +95,19 @@ const verticalContour = computed(() => {
   } else if (biquads && applyIir.value) {
     return iirAppliedSpin(vertSpin.value, biquads)
   } else {
-    return vertSpin.value;
+    return vertSpin.value
   }
 });
-
-const cea2034 = computed(() => horizontalContour.value && verticalContour.value && computeCea2034(horizontalContour.value, verticalContour.value))
 const earlyReflections = computed(() => horizontalContour.value && verticalContour.value && computeEarlyReflections(horizontalContour.value, verticalContour.value))
+
+const cea2034 = computed(() => {
+  if (cea2034Dump.value) {
+    /* FIXME: need to apply IIR filters and normalization to this */
+    return cea2034Dump.value
+  } else {
+    return horizontalContour.value && verticalContour.value && computeCea2034(horizontalContour.value, verticalContour.value)
+  }
+})
 const pir = computed(() => cea2034.value && estimateInRoom(cea2034.value))
 const scores = computed(() => cea2034.value && getScores(cea2034.value))
 
