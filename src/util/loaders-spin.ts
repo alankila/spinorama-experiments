@@ -55,7 +55,7 @@ export async function processSpinoramaFile(zipData: Uint8Array) {
       let freq2 = [...spin[ds].keys()];
       freq2.sort((a, b) => a - b)
       if (JSON.stringify(freq) !== JSON.stringify(freq2)) {
-        throw new Error(`Dataset frequencies are not same as in the spin in general on dataset: ${ds}`)
+        throw new Error(`Dataset frequencies are not same as in the spin in general on dataset: ${ds} [${freq}] vs. [${freq2}]`)
       }
     }
 
@@ -104,24 +104,32 @@ function performHackyRepairs(spins: Spin[]) {
     }
   }
 
-  /* If the files don't provide the > 90 degree angles, we copy the 90 degrees measurement. (Sigh.) */
-  const posAngles = ["180°", "170°", "160°", "150°", "140°", "130°", "120°", "110°", "100°"] as const
-  const negAngles = ["-170°", "-160°", "-150°", "-140°", "-130°", "-120°", "-110°", "-100°"] as const
+  /* If the files don't provide all the angles, we propagate from the on-axis measurement forwards. */
   for (let spin of spins) {
-    if (spin["90°"] && !posAngles.map(ds => spin[ds]).find(x => x)) {
-      for (let ds of posAngles) {
-        spin[ds] = new Map(spin["90°"])
+    let angle = 10
+    let nearestMeasurement = spin["On-Axis"]
+    while (angle <= 180) {
+      const ds = angle + "°" as keyof typeof spin
+      if (ds in spin) {
+        nearestMeasurement = spin[ds]
+      } else {
+        spin[ds] = new Map(nearestMeasurement)
+        isBusted = true
       }
-      isBusted = true
+      angle += 10
     }
-    if (spin["-90°"] && !negAngles.map(ds => spin[ds]).find(x => x)) {
-      for (let ds of negAngles) {
-        spin[ds] = new Map(spin["-90°"])
+
+    angle = -10
+    nearestMeasurement = spin["On-Axis"]
+    while (angle > -180) {
+      const ds = angle + "°" as keyof typeof spin
+      if (ds in spin) {
+        nearestMeasurement = spin[ds]
+      } else {
+        spin[ds] = new Map(nearestMeasurement)
+        isBusted = true
       }
-      if (!spin["180°"]) {
-        spin["180°"] = new Map(spin["-90°"])
-      }
-      isBusted = true
+      angle -= 10
     }
   }
 
@@ -224,9 +232,6 @@ function readKlippelOne(csv: string) {
    */
   // @ts-ignore
   const output: Spin = {}
-  for (let ds of spinKeys) {
-    output[ds] = new Map();
-  }
 
   for (let i = 0; i < datasets.length; i += 2) {
     if (datasets[i+1]) {
@@ -237,6 +242,8 @@ function readKlippelOne(csv: string) {
     if (spinKeys.indexOf(d) === -1) {
       throw new Error(`Unsupported dataset: ${d}`)
     }
+
+    output[d] = new Map();
   }
 
   /* Validate that all frequencies are used consistently, and create Map containers from the data */
