@@ -5,8 +5,6 @@ import { cloneSpinorama, pressure2spl, setToMeanOnAxisLevel } from "./spin-utils
 import fftjs from "fft-js"
 
 export interface SpinoramaData<T extends { [key: string]: Map<number, number> }> {
-  /** Frequencies present on every dataset, in ascending order */
-  freq: number[],
   /** Datasets available */
   datasets: T,
   /** Whether repairs had to be performed on the data like replicating or mirroring measurements to deal with missing data */
@@ -83,10 +81,10 @@ function performHackyRepairs(spins: Spin[]) {
 
   /* If measurement data for other spin is missing, copy the other spin */
   if (!Object.keys(spins[0]).length) {
-    spins[0] = cloneSpinorama({ freq: [], datasets: spins[1], isBusted: true }).datasets
+    spins[0] = cloneSpinorama({ datasets: spins[1], isBusted: true }).datasets
     isBusted = true
   } else if (!Object.keys(spins[1]).length) {
-    spins[1] = cloneSpinorama({ freq: [], datasets: spins[0], isBusted: true, }).datasets
+    spins[1] = cloneSpinorama({ datasets: spins[0], isBusted: true, }).datasets
     isBusted = true
   }
 
@@ -185,7 +183,7 @@ async function readGllHvTxt(files: ZipItem[]) {
 
       let map = new Map()
       for (let row of utf8Decoder.decode(await data.read()).split(/\s*\n/)) {
-        if (!row || row.startsWith("Freq") || row.startsWith("Data") || row.startsWith("Display")) {
+        if (!row || row.startsWith("Freq") || row.startsWith("Data") || row.startsWith("Display") || row.startsWith("Magnitude")) {
           continue
         }
         let [freq, mag, _pha] = row.split(/\s+/).map(v => parseFloat(v))

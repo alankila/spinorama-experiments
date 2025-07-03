@@ -256,11 +256,12 @@ export function renderContour(svg: SVGSVGElement, spin: SpinoramaData<Spin>) {
   let dataH = datasets.length;
   let data = []
 
-  const minFreq = spin.freq.find(f => f > 20) ?? spin.freq[0]
-  const maxFreq = spin.freq.find(f => f > 20000) ?? spin.freq[spin.freq.length - 1]
-  let dataW = spin.freq.filter(f => f >= minFreq && f <= maxFreq).length
+  const frequenciesOnDataset = [...spin.datasets["On-Axis"].keys()].sort((a, b) => a - b)
+  const minFreq = frequenciesOnDataset.find(f => f > 20) ?? frequenciesOnDataset[0]
+  const maxFreq = frequenciesOnDataset.find(f => f > 20000) ?? frequenciesOnDataset[frequenciesOnDataset.length - 1]
+  let dataW = frequenciesOnDataset.filter(f => f >= minFreq && f <= maxFreq).length
   for (let name of datasets) {
-    for (let freq of spin.freq) {
+    for (let freq of frequenciesOnDataset) {
       if (freq < minFreq || freq > maxFreq) {
         continue
       }

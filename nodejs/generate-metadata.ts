@@ -75,7 +75,7 @@ for (let file of files) {
     }
 
     ourMetadata[speakerId].measurements[measurementId] = {
-        format: theirs.measurements[measurementId]?.format,
+        format: theirs.measurements[measurementId]?.format ?? "unknown",
         scores,
     }
 

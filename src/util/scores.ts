@@ -107,20 +107,21 @@ function computeLfxHz(cea2034: SpinoramaData<CEA2034>) {
 
     /* Walk frequencies down to 300 Hz, then choose first point where response drops below lwRef */
     const sp = cea2034.datasets["Sound Power"];
-    for (let i = cea2034.freq.length - 2; i >= 0; i --) {
-        let freq = cea2034.freq[i]
+    const freqs = [...sp.keys()].sort((a, b) => a - b)
+    for (let i = freqs.length - 2; i >= 0; i --) {
+        let freq = freqs[i]
         if (freq > 300) {
             continue
         }
 
         if ((sp.get(freq) ?? 0) < lwRef) {
             /* Estimate the average between the two datapoints for where -6 dB is crossed */
-            return (freq + cea2034.freq[i + 1]) / 2
+            return (freq + freqs[i + 1]) / 2
         }
     }
 
     /* Return the 1st frequency as the limit if we didn't hit such freq, or at least 14.5 so we don't overshoot our "ideal sub" figure if measurement ges below 14.5 Hz */
-    return Math.max(cea2034.freq[0], LFX_MIN_HZ)
+    return Math.max(freqs[0], LFX_MIN_HZ)
 }
 
 /**
@@ -137,7 +138,8 @@ function computeLfxHz(cea2034: SpinoramaData<CEA2034>) {
  * 1/2-octave band is based a sample of 10 equally log-spaced data points.
  */
 function nbd<T extends { [key: string]: Map<number, number> }>(spin: SpinoramaData<T>, name: keyof T) {
-    const bandMinFreq = Math.max(NBD_MIN_HZ, spin.freq[0])
+    const min = Math.min(...spin.datasets[name].keys())
+    const bandMinFreq = Math.max(NBD_MIN_HZ, min)
     const bands = octave(2).filter(p => p[1] >= bandMinFreq && p[1] <= NBD_MAX_HZ).map(b => {
         let avg = 0
         let count = 0

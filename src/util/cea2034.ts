@@ -115,12 +115,12 @@ export const spinKeys = [
 
 /** 
  * Compute the spatial average of pressure with a function.
+ * 
+ * Spatial average is not computed correctly if the spins are not uniform.
+ * We take pains to validate that SpinoramaData<Spin> is valid in the loader, and all datasets are guaranteed to be uniform.
  */
 function spatialAverage<T extends { [key: string]: Map<number, number> }>(spins: SpinoramaData<T>[], datasetFilter: (spin: SpinoramaData<T>, name: keyof T) => boolean, spatially_weighted: boolean) {
     const result = new Map<number, [number, number]>()
-    for (let x of spins[0].freq) {
-        result.set(x, [0, 0])
-    }
     
     /* Average the spins provided as argument. */
     let isBusted = false
@@ -133,12 +133,9 @@ function spatialAverage<T extends { [key: string]: Map<number, number> }>(spins:
             isBusted ||= spin.isBusted
 
             for (let data of entry[1].entries()) {
-                let res = result.get(data[0])
-                if (!res) {
-                    throw new Error(`Something wrong, unexpected frequency ${res}`)
-                }
+                let res = result.get(data[0]) ?? [0, 0]
 
-                // @ts-ignore 
+                // @ts-ignore spatial weighting is assuming that T = Spin. Can't verify that statically, though.
                 const weight = spatially_weighted ? sp_weigths[entry[0]] ?? (() => { throw new Error(`Expected to find dataset ${entry[0]}`) })() : 1;
                 res[0] += spl2pressure(data[1]) ** 2 * weight
                 res[1] += weight
@@ -147,7 +144,6 @@ function spatialAverage<T extends { [key: string]: Map<number, number> }>(spins:
     }
 
     return {
-        freq: spins[0].freq,
         isBusted,
         datasets: {
             Average: new Map([...result].map(r => {
@@ -210,14 +206,13 @@ export function estimatedInRoom(cea2034: SpinoramaData<CEA2034>) {
     let sp = cea2034.datasets["Sound Power"]
 
     let data = new Map<number, number>()
-    for (let f of cea2034.freq) {
+    for (let f of lw.keys()) {
         let sum = 0.12 * spl2pressure(lw.get(f) ?? 0) ** 2
         + 0.44 * spl2pressure(er.get(f) ?? 0) ** 2
         + 0.44 * spl2pressure(sp.get(f) ?? 0) ** 2
         data.set(f, pressure2spl(sum ** 0.5))
     }
     return {
-        freq: cea2034.freq,
         isBusted: cea2034.isBusted,
         datasets: {
             "Estimated In-Room": data,
@@ -240,7 +235,6 @@ export function computeEarlyReflections(horizSpin: SpinoramaData<Spin>, vertSpin
     const totalEarlyReflection = spatialAverage([floorBounce, ceilingBounce, frontWallBounce, sideWallBounce, rearWallBounce], () => true, false)
 
     return {
-        freq: floorBounce.freq,
         isBusted: floorBounce.isBusted || ceilingBounce.isBusted || frontWallBounce.isBusted || sideWallBounce.isBusted || rearWallBounce.isBusted || totalHorizontalReflection.isBusted || totalVerticalReflection.isBusted || totalEarlyReflection.isBusted,
         datasets: {
             "Floor Bounce": floorBounce.datasets.Average,
@@ -277,7 +271,7 @@ export function computeCea2034(horizSpin: SpinoramaData<Spin>, vertSpin: Spinora
     const er = computeEarlyReflections(horizSpin, vertSpin)
 
     const erdi = new Map<number, number>();
-    for (let f of horizSpin.freq) {
+    for (let f of lw.datasets.Average.keys()) {
         erdi.set(f, (lw.datasets.Average.get(f) ?? 0) - (er.datasets["Total Early Reflections"].get(f) ?? 0))
     }
 
@@ -289,12 +283,11 @@ export function computeCea2034(horizSpin: SpinoramaData<Spin>, vertSpin: Spinora
      * more directional the loudspeaker is in the direction of the reference axis.
      */
     const spdi = new Map<number, number>()
-    for (let f of horizSpin.freq) {
+    for (let f of lw.datasets.Average.keys()) {
         spdi.set(f, (lw.datasets.Average.get(f) ?? 0) - (sp.datasets.Average.get(f) ?? 0))
     }
 
     return {
-        freq: horizSpin.freq,
         isBusted: onaxis.isBusted || lw.isBusted || sp.isBusted || er.isBusted,
         datasets: {
             "On-Axis": onaxis.datasets.Average,

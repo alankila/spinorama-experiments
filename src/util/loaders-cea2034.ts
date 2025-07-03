@@ -25,23 +25,14 @@ export async function processCea2034File(zipData: Uint8Array): Promise<Spinorama
   if (!cea2034["On-Axis"]) {
     throw new Error(`Missing a dataset: On-Axis; found: ${Object.keys(cea2034)}`)
   }
-  const freq = [...cea2034["On-Axis"].keys()]
-  freq.sort((a, b) => a - b)
 
   for (let ds of cea2034Keys) {
     if (!cea2034[ds]) {
       throw new Error(`Missing a dataset: ${ds}; found: ${Object.keys(cea2034)}`)
     }
-
-    let freq2 = [...cea2034[ds].keys()];
-    freq2.sort((a, b) => a - b)
-    if (JSON.stringify(freq) !== JSON.stringify(freq2)) {
-      throw new Error(`Dataset frequencies are not same as in the spin in general on dataset: ${ds}`)
-    }
   }
 
   return {
-    freq,
     isBusted: false,
     datasets: cea2034,
   }
