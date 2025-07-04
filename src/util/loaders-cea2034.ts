@@ -28,6 +28,10 @@ export async function processCea2034File(zipData: Uint8Array): Promise<Spinorama
   }
 
   let isBusted = false
+  if (!cea2034["Total Early Reflections"]) {
+    cea2034["Total Early Reflections"] = new Map()
+    isBusted = true
+  }
   /* Deal with missing DI datasets, these are rarely provided */
   if (!cea2034["Early Reflections DI"]) {
     cea2034["Early Reflections DI"] = new Map()
@@ -96,8 +100,13 @@ async function readRewTextDump(files: ZipItem[]) {
 
   cea2034["On-Axis"] = await readRewFile(files, "On Axis.txt")
   cea2034["Listening Window"] = await readRewFile(files, "LW.txt")
-  cea2034["Total Early Reflections"] = await readRewFile(files, "ER.txt")
   cea2034["Sound Power"] = await readRewFile(files, "SP.txt")
+  try {
+    cea2034["Total Early Reflections"] = await readRewFile(files, "ER.txt")
+  }
+  catch (error) {
+    /* We can still calculate score even when we don't have this */
+  }
   try {
     cea2034["Sound Power DI"] = await readRewFile(files, "DI.txt")
   }

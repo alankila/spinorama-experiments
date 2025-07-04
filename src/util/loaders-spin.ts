@@ -28,7 +28,7 @@ export async function processSpinoramaFile(zipData: Uint8Array) {
   let spins: Spin[];
   if (files.find(f => f.filename === "SPL Horizontal.txt") && files.find(f => f.filename === "SPL Vertical.txt")) {
     spins = await readKlippel(files);
-  } else if (files.find(f => f.filename.endsWith("_H 0.txt") || f.filename.endsWith("0_H.txt"))) {
+  } else if (files.find(f => /(?:_H.* 0|(?:^| )0.*_H).txt$/.exec(f.filename))) {
     spins = await readSplHvTxt(files)
   } else if (files.find(f => f.filename.endsWith("-M0-P0.txt"))) {
     spins = await readGllHvTxt(files)
@@ -144,10 +144,9 @@ async function readSplHvTxt(files: ZipItem[]) {
   for (let dir of ["H", "V"]) {
     let spin = dir === "H" ? horizSpin : vertSpin
     for (let angle of spinKeys) {
-      let name1 = ` _${dir} ${angle === 'On-Axis' ? 0 : angle.replace("°", "")}.txt`
-      let name2 = `${angle === 'On-Axis' ? 0 : angle.replace("°", "")}_${dir}.txt`
-      
-      let data = files.find(f => f.filename.endsWith(name1) || f.filename.endsWith(name2))
+      let name1 = new RegExp(` _${dir}.* ${angle === 'On-Axis' ? 0 : angle.replace("°", "")}\\.txt$`)
+      let name2 = new RegExp(`(?:^| )${angle === 'On-Axis' ? 0 : angle.replace("°", "")}.*_${dir}\\.txt$`)
+      let data = files.find(f => name1.exec(f.filename) || name2.exec(f.filename))
       if (!data) {
         continue
       }
