@@ -15,7 +15,7 @@ export async function processCea2034File(zipData: Uint8Array): Promise<Spinorama
   const files = unzip(zipData)
 
   let cea2034: CEA2034;
-  if (files.find(f => f.filename.endsWith("wpd.json"))) {
+  if (files.find(f => f.filename.endsWith(".json"))) {
     cea2034 = await readWebplotDigitizer(files)
   } else if (files.find(f => f.filename.endsWith("On Axis.txt"))) {
     cea2034 = await readRewTextDump(files)
@@ -27,6 +27,17 @@ export async function processCea2034File(zipData: Uint8Array): Promise<Spinorama
     throw new Error(`Missing a dataset: On-Axis; found: ${Object.keys(cea2034)}`)
   }
 
+  let isBusted = false
+  /* Deal with missing DI datasets, these are rarely provided */
+  if (!cea2034["Early Reflections DI"]) {
+    cea2034["Early Reflections DI"] = new Map()
+    isBusted = true
+  }
+  if (!cea2034["Sound Power DI"]) {
+    cea2034["Sound Power DI"] = new Map()
+    isBusted = true
+  }
+
   for (let ds of cea2034Keys) {
     if (!cea2034[ds]) {
       throw new Error(`Missing a dataset: ${ds}; found: ${Object.keys(cea2034)}`)
@@ -34,13 +45,13 @@ export async function processCea2034File(zipData: Uint8Array): Promise<Spinorama
   }
 
   return {
-    isBusted: false,
+    isBusted,
     datasets: cea2034,
   }
 }
 
 async function readWebplotDigitizer(files: ZipItem[]) {
-  const file = await files.find(f => f.filename.endsWith("wpd.json"))!.read()
+  const file = await files.find(f => !f.filename.endsWith("info.json") && f.filename.endsWith(".json"))!.read()
 
   const webplot: {
     datasetColl: {
@@ -87,8 +98,18 @@ async function readRewTextDump(files: ZipItem[]) {
   cea2034["Listening Window"] = await readRewFile(files, "LW.txt")
   cea2034["Total Early Reflections"] = await readRewFile(files, "ER.txt")
   cea2034["Sound Power"] = await readRewFile(files, "SP.txt")
-  cea2034["Sound Power DI"] = await readRewFile(files, "DI.txt")
-  cea2034["Early Reflections DI"] = await readRewFile(files, "ERDI.txt")
+  try {
+    cea2034["Sound Power DI"] = await readRewFile(files, "DI.txt")
+  }
+  catch (error) {
+    /* ignoring, DI files are not always provided */
+  }
+  try {
+    cea2034["Early Reflections DI"] = await readRewFile(files, "ERDI.txt")
+  }
+  catch (error) {
+    /* ignoring, DI files are not always provided */
+  }
 
   return cea2034
 }
