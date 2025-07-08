@@ -262,7 +262,7 @@ function computeOnAxis(horizSpin: SpinoramaData<Spin>, vertSpin: SpinoramaData<S
  *
  * @param horizSpin 
  * @param vertSpin 
- * @returns 
+ * @returns
  */
 export function computeCea2034(horizSpin: SpinoramaData<Spin>, vertSpin: SpinoramaData<Spin>): SpinoramaData<CEA2034> {
     const onaxis = computeOnAxis(horizSpin, vertSpin)

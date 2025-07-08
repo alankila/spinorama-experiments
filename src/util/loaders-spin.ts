@@ -1,16 +1,29 @@
-import { spinKeys,type Spin } from "./cea2034";
+import { spinKeys, type Spin } from "./cea2034";
 import { unzip, type ZipItem } from "but-unzip";
 import { cloneSpinorama, pressure2spl, setToMeanOnAxisLevel } from "./spin-utils";
 // @ts-ignore
 import fftjs from "fft-js"
 
+/**
+ * Represents the structure of the Spinorama data.
+ * @template T - An object type where each key maps to a `Map<number, number>`.
+ */
 export interface SpinoramaData<T extends { [key: string]: Map<number, number> }> {
-  /** Datasets available */
-  datasets: T,
-  /** Whether repairs had to be performed on the data like replicating or mirroring measurements to deal with missing data */
-  isBusted: boolean,
+  /**
+   * A collection of datasets.
+   * Each key in the object corresponds to a dataset label,
+   * and the associated value is a `Map` where the keys represent frequencies and the values represent the corresponding measurements.
+   */
+  datasets: T;
+
+  /**
+   * A boolean flag indicating whether the data has undergone any repair operations.
+   * Repair operations might include replicating or mirroring measurements to compensate for missing data.
+   */
+  isBusted: boolean;
 }
 
+/** Decoder for UTF-8 encoded binary data.  */
 const utf8Decoder = new TextDecoder("utf-8")
 
 /** Read measurements that are full spinorama spins. */
@@ -22,6 +35,7 @@ export async function getZipData(url: string): Promise<Uint8Array> {
   return new Uint8Array(await zipRequest.arrayBuffer())
 }
 
+/** Reads a zip file and returns the contents of the specified file. */
 export async function processSpinoramaFile(zipData: Uint8Array) {
   const files = unzip(new Uint8Array(zipData))
 
@@ -182,7 +196,7 @@ async function readGllHvTxt(files: ZipItem[]) {
         m += 180
       }
       let p = Math.abs(angle === "On-Axis" ? 0 : Math.abs(parseFloat(angle.replace("°", ""))))
-      let name = `-M${m}-P${p}.txt`;      
+      let name = `-M${m}-P${p}.txt`;
       let data = files.find(f => f.filename.endsWith(name))
       if (!data) {
         throw new Error(`Was not able to find measurement angle ${name} in GLL HV data`)
@@ -233,8 +247,8 @@ function readKlippelOne(csv: string) {
   const output: Spin = {}
 
   for (let i = 0; i < datasets.length; i += 2) {
-    if (datasets[i+1]) {
-      throw new Error(`Unexpected dataset name at index ${i+1}`);
+    if (datasets[i + 1]) {
+      throw new Error(`Unexpected dataset name at index ${i + 1}`);
     }
 
     let d = <keyof Spin>datasets[i]
@@ -262,7 +276,7 @@ function readKlippelOne(csv: string) {
       map.set(freq, parseFloat(row[i + 1].replace(",", "")))
     }
 
-    count ++;
+    count++;
   }
 
   return output
@@ -284,19 +298,21 @@ function readPrincetonOne(mat: Uint8Array) {
   const types = [Float64Array, Float32Array, Int32Array, Int16Array, Uint16Array, Uint8Array] as const;
   const sizes = [8, 4, 4, 2, 2, 1] as const
 
-  let matrices: { [name: string]: {
-    mrows: number,
-    ncols: number,
-    array: MatTypes,
-  } } = {}
+  let matrices: {
+    [name: string]: {
+      mrows: number,
+      ncols: number,
+      array: MatTypes,
+    }
+  } = {}
 
   let i = 0;
   while (i < mat.length) {
     let type = readIntBE(mat, i)
-    let mrows = readIntBE(mat, i+4)
-    let ncols = readIntBE(mat, i+8)
-    let imagf = readIntBE(mat, i+12)
-    let namelen = readIntBE(mat, i+16)
+    let mrows = readIntBE(mat, i + 4)
+    let ncols = readIntBE(mat, i + 8)
+    let imagf = readIntBE(mat, i + 12)
+    let namelen = readIntBE(mat, i + 16)
     i += 20
 
     const endian = Math.floor(type / 1000) % 10
@@ -313,7 +329,7 @@ function readPrincetonOne(mat: Uint8Array) {
     if ((type % 10) !== 0) {
       throw new Error(`Matlab V4 matrices MOPT = ${type}: should have T=0`)
     }
-    
+
     if (!mrows || !ncols) {
       throw new Error(`Matrix size has dimension 0: ${ncols}x${mrows}`)
     }
@@ -331,8 +347,8 @@ function readPrincetonOne(mat: Uint8Array) {
     if (i + length > mat.length) {
       throw new Error(`Matrix ${name} exceeds file bounds`);
     }
-    const endianSwapped = endianToNative(mat, i, i + length, sizes[precision], endian)
-    const array = new types[precision](endianSwapped.buffer.slice(i, i + length))
+    endianToNative(mat, i, i + length, sizes[precision], endian)
+    const array = new types[precision](mat.buffer.slice(i, i + length))
     matrices[name.replace(/_[HV]$/, "")] = {
       mrows,
       ncols,
@@ -354,7 +370,7 @@ function readPrincetonOne(mat: Uint8Array) {
   const measurements = matrices["IR"].mrows
   const fftLength = matrices["IR"].ncols
   /* Sample the FFT for 24 points per octave. */
-  const density = 2 ** (1/24)
+  const density = 2 ** (1 / 24)
   const sqrtDensity = density ** 0.5
 
   // @ts-ignore
@@ -362,7 +378,7 @@ function readPrincetonOne(mat: Uint8Array) {
 
   //console.log("File contains", measurements, "angles with resolution", fftLength)
 
-  for (let n = 0; n < measurements; n ++) {
+  for (let n = 0; n < measurements; n++) {
     let angle = Math.round(n * 360 / measurements)
     if ((angle % 10) != 0) {
       continue
@@ -376,7 +392,7 @@ function readPrincetonOne(mat: Uint8Array) {
     const ir = matrices["IR"].array
     const data: number[] | number[][] = []
     let anyNonZero = false
-    for (let m = 0; m < fftLength; m ++) {
+    for (let m = 0; m < fftLength; m++) {
       const v = ir[n + m * measurements]
       data[m] = v
       anyNonZero ||= v != 0
@@ -387,7 +403,7 @@ function readPrincetonOne(mat: Uint8Array) {
 
     fftjs.fftInPlace(data);
     const result = <number[][]>data
-    
+
     let map = new Map<number, number>()
     for (let freq = 20; freq < 20000; freq = freq * density) {
       /* Figure out which bins to average in the calculation of the resampled bin. These form a contiguous nonoverlapping sequence over the original FFT */
@@ -399,7 +415,7 @@ function readPrincetonOne(mat: Uint8Array) {
        * x axis integral for a line from (x1, y1) to (x2, y2) = (y2 + y1) / 2 * (x2 - x1) or the midpoint of y's times the x span.
        */
       let mag = 0;
-      for (let idx = Math.floor(minIdx); idx < maxIdx && idx + 1 < fftLength / 2; idx ++) {
+      for (let idx = Math.floor(minIdx); idx < maxIdx && idx + 1 < fftLength / 2; idx++) {
         const a = (result[idx][0] ** 2 + result[idx][1] ** 2) ** 0.5
         const b = (result[idx + 1][0] ** 2 + result[idx + 1][1] ** 2) ** 0.5
 
@@ -425,15 +441,15 @@ function readIntBE(mat: Uint8Array, pos: number) {
   if (pos < 0 || pos > mat.length - 4) {
     throw new Error(`Read past end of file: ${pos}/${mat.length}`)
   }
-  return (mat[pos] << 24) | (mat[pos+1] << 16) | (mat[pos+2] << 8) | (mat[pos+3])
+  return (mat[pos] << 24) | (mat[pos + 1] << 16) | (mat[pos + 2] << 8) | (mat[pos + 3])
 }
 
-function readText(mat: Uint8Array, pos: number, len: number)  {
+function readText(mat: Uint8Array, pos: number, len: number) {
   if (pos < 0 || pos > mat.length - len) {
     throw new Error(`Read past end of file: ${pos}/${mat.length}`)
   }
   return String.fromCodePoint(...mat.slice(pos, pos + len - 1)).replace("\x00", "")
-} 
+}
 
 /**
  * In-place endianness swap, done as needed
@@ -448,18 +464,17 @@ function endianToNative(array: Uint8Array, start: number, end: number, elementSi
     /* nothing to do */
   } else if (elementSize == 2) {
     for (let i = start; i < end; i += 2) {
-      [array[i+1], array[i]] = [array[i], array[i+1]]
+      [array[i + 1], array[i]] = [array[i], array[i + 1]]
     }
   } else if (elementSize == 4) {
     for (let i = start; i < end; i += 4) {
-      [array[i+3], array[i+2], array[i+1], array[i]] = [array[i], array[i+1], array[i+2], array[i+3]]
+      [array[i + 3], array[i + 2], array[i + 1], array[i]] = [array[i], array[i + 1], array[i + 2], array[i + 3]]
     }
   } else if (elementSize == 8) {
     for (let i = start; i < end; i += 8) {
-      [array[i+7], array[i+6], array[i+5], array[i+4], array[i+3], array[i+2], array[i+1], array[i]] = [array[i], array[i+1], array[i+2], array[i+3], array[i+4], array[i+5], array[i+6], array[i+7]]
+      [array[i + 7], array[i + 6], array[i + 5], array[i + 4], array[i + 3], array[i + 2], array[i + 1], array[i]] = [array[i], array[i + 1], array[i + 2], array[i + 3], array[i + 4], array[i + 5], array[i + 6], array[i + 7]]
     }
   } else {
     throw new Error(`Endian swap doesn't recognize element size ${elementSize}`)
   }
-  return array
 }
