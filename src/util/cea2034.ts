@@ -133,7 +133,11 @@ function spatialAverage<T extends { [key: string]: Map<number, number> }>(spins:
             isBusted ||= spin.isBusted
 
             for (let data of entry[1].entries()) {
-                let res = result.get(data[0]) ?? [0, 0]
+                let res = result.get(data[0]);
+                if (!res) {
+                    res = [0, 0]
+                    result.set(data[0], res)
+                }
 
                 // @ts-ignore spatial weighting is assuming that T = Spin. Can't verify that statically, though.
                 const weight = spatially_weighted ? sp_weigths[entry[0]] ?? (() => { throw new Error(`Expected to find dataset ${entry[0]}`) })() : 1;

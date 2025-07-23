@@ -7,13 +7,36 @@ import { onMounted, onUnmounted, ref, useTemplateRef, watchEffect } from 'vue'
 
 const svg = useTemplateRef("svg")
 
-const { render, spin, datasets, regression, domain } = defineProps<{
+/**
+ * Component props with TypeScript definitions
+ */
+const props = defineProps<{
+  /**
+   * The rendering function for the graph
+   */
   render: GraphType<T>,
+  /**
+   * The spinorama data to visualize
+   */
   spin: SpinoramaData<T>,
+  /**
+   * Array of dataset keys to render
+   */
   datasets: readonly (keyof T & string)[],
+
+  /**
+   * Optional regression domain parameters
+   */
   regression?: Domain,
+
+  /**
+   * Optional domain parameters for y-axis scaling
+   */
   domain?: Domain,
 }>()
+
+// Destructure props for cleaner usage
+const { render, spin, datasets, regression, domain } = props
 
 const refreshCounter = ref(1);
 let renderedWidth = -1;

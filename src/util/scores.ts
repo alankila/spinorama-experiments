@@ -81,8 +81,8 @@ function octave(count: number) {
 }
 
 export function getScores(cea2034: SpinoramaData<CEA2034>): Scores {
-    const lfxHz = computeLfxHz(cea2034)
-    const pir = estimatedInRoom(cea2034)
+    const lfxHz = computeLfxHz(cea2034) || LFX_MIN_HZ
+    const pir = estimatedInRoom(cea2034) || 0
     const nbdOnAxis = nbd(cea2034, "On-Axis") || 0
     const nbdPredInRoom = nbd(pir, "Estimated In-Room") || 0
     const smPredInRoom = sm(pir, "Estimated In-Room") || 1
@@ -120,7 +120,7 @@ function computeLfxHz(cea2034: SpinoramaData<CEA2034>) {
         }
     }
 
-    /* Return the 1st frequency as the limit if we didn't hit such freq, or at least 14.5 so we don't overshoot our "ideal sub" figure if measurement ges below 14.5 Hz */
+    /* Return the 1st frequency as the limit if we didn't hit such freq, or at least 14.5 so we don't overshoot our "ideal sub" figure if measurement goes below 14.5 Hz */
     return Math.max(freqs[0], LFX_MIN_HZ)
 }
 
