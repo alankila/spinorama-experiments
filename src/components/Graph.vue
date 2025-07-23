@@ -61,16 +61,12 @@ watchEffect(() => {
 });
 
 {
-  function refresh() {
-    refreshCounter.value += 1
-  }
+  const refresh = () => {
+    refreshCounter.value += renderedWidth != svg.value?.getBoundingClientRect().width ? 1 : 0    
+  };
 
-  onMounted(() => {
-    window.addEventListener("resize", ev => refreshCounter.value += renderedWidth != svg.value?.getBoundingClientRect().width ? 1 : 0)
-  })
-  onUnmounted(() => {
-    window.removeEventListener("resize", refresh);
-  })
+  onMounted(() => window.addEventListener("resize", refresh))
+  onUnmounted(() => window.removeEventListener("resize", refresh))
 }
 
 </script>
