@@ -1,6 +1,7 @@
 <script setup lang="ts">
 
 import ourMetadata from "@/our-metadata.json"
+import { useAppState } from "@/util/app-state";
 import type { Speaker } from "@/util/scores";
 import { onUnmounted, ref, watchEffect, type Ref } from 'vue'
 
@@ -28,7 +29,7 @@ function debounce<T extends (...args: any) => void>(func: T, delay = 300) {
   }
 }
 
-const search = ref("");
+const { speakerListSearch } = useAppState();
 
 let filteredMetadata: Ref<[string, Speaker][]> = ref([])
 
@@ -51,7 +52,7 @@ const filterMetadata = debounce((lcSearch: string) => {
 });
 
 watchEffect(() => {
-  const lcSearch = search.value.toLowerCase()
+  const lcSearch = speakerListSearch.value.toLowerCase()
   filterMetadata(lcSearch)
 })
 
@@ -62,7 +63,7 @@ watchEffect(() => {
     <h1 class="font-bold self-center p-4">Unofficial spinorama<br/>(experimental version)</h1>
 
     <div class="grid self-center p-4">
-      <input type="text" class="border p-2" v-model="search" placeholder="Brand or model..."/>
+      <input type="text" class="border p-2" v-model="speakerListSearch" placeholder="Brand or model..."/>
     </div>
 
     <div class="bg-spinorama-bg-darker col-span-2 grid gap-4 overflow-y-scroll p-4 justify-center border-t auto-fit-cols">

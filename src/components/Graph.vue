@@ -10,7 +10,7 @@ const svg = useTemplateRef("svg")
 /**
  * Component props with TypeScript definitions
  */
-const props = defineProps<{
+const { render, spin, datasets, regression, domain } = defineProps<{
   /**
    * The rendering function for the graph
    */
@@ -34,9 +34,6 @@ const props = defineProps<{
    */
   domain?: Domain,
 }>()
-
-// Destructure props for cleaner usage
-const { render, spin, datasets, regression, domain } = props
 
 const refreshCounter = ref(1);
 let renderedWidth = -1;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 
-import { computed, ref, watchEffect } from "vue";
+import { computed, ref, watch, watchEffect } from "vue";
 import { getZipData, processSpinoramaFile, type SpinoramaData } from "@/util/loaders-spin";
 import { useRouter } from "vue-router";
 import { computeCea2034 as computeCea2034, computeEarlyReflections, estimatedInRoom as estimateInRoom, type CEA2034, type Spin } from "@/util/cea2034";
@@ -11,15 +11,20 @@ import { getScores, PIR_MIN_HZ, PIR_MAX_HZ, type OurMetadata } from "@/util/scor
 import { iirAppliedSpin, iirToSpin, normalizedToOnAxis } from "@/util/spin-utils";
 import ourMetadata from "@/our-metadata.json"
 import { processCea2034File } from "@/util/loaders-cea2034";
+import { useAppState } from "@/util/app-state";
 
 const { speakerId, measurementId } = defineProps<{ speakerId: keyof typeof ourMetadata, measurementId: string }>();
 const router = useRouter();
 
-const applyIir = ref(false);
-const showNormalized = ref(false);
+// Use shared state
+const { applyIir, showNormalized } = useAppState();
+const shownMeasurementId = ref(measurementId)
 
 const measurements = Object.keys(ourMetadata[speakerId].measurements)
-const shownMeasurementId = ref(measurementId)
+
+watch(shownMeasurementId, () => {
+  router.push(shownMeasurementId.value)
+});
 
 let biquads: Biquads | undefined
 let iirSpin: SpinoramaData<{ [key: string]: Map<number, number> }> | undefined;
@@ -117,7 +122,7 @@ const directivityAngles = ["60°", "50°", "40°", "30°", "20°", "10°", "On-A
 
 <template>
   <div class="grid grid-cols-[max-content_1fr] grid-rows-[max-content_1fr] max-h-lvh">
-    <h1 class="text-3xl font-bold self-center p-4">{{ ourMetadata[speakerId].brand }} {{ ourMetadata[speakerId].model }}</h1>
+    <h1 class="text-3xl font-bold self-center p-4"><RouterLink to="/">{{ ourMetadata[speakerId].brand }} {{ ourMetadata[speakerId].model }}</RouterLink></h1>
 
     <div class="grid grid-flow-col auto-cols-max items-start gap-8 p-4">
       <div class="grid">

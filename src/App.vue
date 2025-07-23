@@ -1,5 +1,10 @@
 <script setup lang="ts">
+
 import { RouterView } from 'vue-router'
+import { provideAppState } from './util/app-state';
+
+provideAppState();
+
 </script>
 
 <template>
